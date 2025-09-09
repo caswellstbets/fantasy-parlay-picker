@@ -98,7 +98,6 @@
                 <option value="Under">Under</option>
             </select>
             <input type="text" id="totalInput" value="X" placeholder="Total (X = default)">
-            <p>Enter total or "X" for default (accepts "x", "default", "Default").</p>
         </div>
         <button onclick="submitPick()">Submit Pick</button>
         <p id="result"></p>
@@ -363,7 +362,7 @@
 
             if (type === 'Moneyline') {
                 const pickedTeam = document.getElementById('teamPickSelect').value;
-                if (!pickedTeam || !teams.includes(pickedTeam)) {
+                if (!pickedTeam || !teams.includes(pickedTeam) || !isValidTeam(pickedTeam)) {
                     result.textContent = 'Invalid team for Moneyline.';
                     return;
                 }
@@ -371,7 +370,7 @@
             } else if (type === 'Spread') {
                 const pickedTeam = document.getElementById('teamPickSelect').value;
                 const spread = document.getElementById('spreadSelect').value;
-                if (!pickedTeam || !teams.includes(pickedTeam) || !spread) {
+                if (!pickedTeam || !teams.includes(pickedTeam) || !isValidTeam(pickedTeam) || !spread) {
                     result.textContent = 'Invalid team or spread for Spread.';
                     return;
                 }
@@ -379,12 +378,17 @@
                 details = getAbbr(pickedTeam) + ' ' + spreadDisplay;
             } else if (type === 'Over/Under') {
                 const ou = document.getElementById('overUnderSelect').value;
-                let total = document.getElementById('totalInput').value.trim().toLowerCase();
-                if (!ou || !total) {
-                    result.textContent = 'Invalid Over/Under or total.';
+                let total = document.getElementById('totalInput').value.trim();
+                if (!ou) {
+                    result.textContent = 'Please select Over or Under.';
                     return;
                 }
-                if (['x', 'default'].includes(total)) total = 'Default';
+                if (['X', 'x', 'default', 'Default'].includes(total.toLowerCase())) {
+                    total = 'X';
+                } else if (isNaN(total) || total <= 0) {
+                    result.textContent = 'Total must be a positive number or "X" for default.';
+                    return;
+                }
                 details = ou + ' ' + total.toUpperCase();
             }
 
