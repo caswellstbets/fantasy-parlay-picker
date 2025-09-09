@@ -17,13 +17,14 @@
         select, input { width: 100%; margin-bottom: 10px; padding: 5px; box-sizing: border-box; }
         button { padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; width: 100%; }
         #result { color: red; }
+        .hidden { display: none; }
         @media (max-width: 600px) { table { font-size: 12px; } th, td { padding: 6px; } }
     </style>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
-    <h2>Fantasy Parlay Picks - Week 2</h2>
+    <h2>Fantasy Parlay Picks - Week X</h2>
     
     <h3>Availability Grid (Green = Open, Red = Picked)</h3>
     <table id="gridTable">
@@ -80,7 +81,25 @@
             <option value="Spread">Spread</option>
             <option value="Over/Under">Over/Under</option>
         </select>
-        <input type="text" id="detailsInput" placeholder="Details (e.g., Packers, Green Bay, GB -3.5, or Over 45.5)">
+        <div id="teamPickDiv" class="hidden">
+            <select id="teamPickSelect">
+                <option value="">Select team</option>
+            </select>
+        </div>
+        <div id="spreadDiv" class="hidden">
+            <select id="spreadSelect">
+                <option value="">Select spread</option>
+            </select>
+        </div>
+        <div id="overUnderDiv" class="hidden">
+            <select id="overUnderSelect">
+                <option value="">Select Over/Under</option>
+                <option value="Over">Over</option>
+                <option value="Under">Under</option>
+            </select>
+            <input type="text" id="totalInput" value="X" placeholder="Total (X = default)">
+            <p>Enter total or "X" for default (accepts "x", "default", "Default").</p>
+        </div>
         <button onclick="submitPick()">Submit Pick</button>
         <p id="result"></p>
     </div>
@@ -174,28 +193,20 @@
             return getAbbr(away) + ' @ ' + getAbbr(home);
         }
 
-        // Function to parse NFL team from details based on type
-        function parseNflTeamFromDetails(details, type, matchup) {
-            details = details.trim();
-            let teamName = "";
-            if (type === "Moneyline") {
-                // First word (could be full name, city, or abbr)
-                teamName = details.split(" ")[0];
-            } else if (type === "Spread") {
-                // Team before +/- (full name, city, or abbr)
-                const match = details.match(/^([\w\s]+?)([+-]\d+(\.\d+)?)/);
-                if (match) teamName = match[1].trim();
-            } else if (type === "Over/Under") {
-                // Default to home team for totals
-                const homeTeam = matchup.split(" @ ")[1].trim();
-                teamName = homeTeam;
-            }
-            return getAbbr(teamName);
-        }
-
         // Function to get first 5 letters of fantasy team name, ignoring ' and .
         function getFirstFiveLetters(teamName) {
             return teamName.replace(/['.]/g, '').slice(0, 5);
+        }
+
+        // Function to get teams from matchup
+        function getTeamsFromMatchup(matchup) {
+            const [away, home] = matchup.split(' @ ');
+            return [away.trim(), home.trim()];
+        }
+
+        // Function to is valid team input
+        function isValidTeam(input) {
+            return getAbbr(input) !== "UNK";
         }
 
         // Populate matchup dropdown with full names
@@ -214,6 +225,60 @@
             th.textContent = abbreviateMatchup(m);
             headerRow.appendChild(th);
         });
+
+        // Dynamic form fields
+        const betTypeSelect = document.getElementById('betTypeSelect');
+        const teamPickDiv = document.getElementById('teamPickDiv');
+        const spreadDiv = document.getElementById('spreadDiv');
+        const overUnderDiv = document.getElementById('overUnderDiv');
+        const teamPickSelect = document.getElementById('teamPickSelect');
+        const spreadSelect = document.getElementById('spreadSelect');
+        const overUnderSelect = document.getElementById('overUnderSelect');
+        const totalInput = document.getElementById('totalInput');
+
+        betTypeSelect.addEventListener('change', updateFormFields);
+        matchupSelect.addEventListener('change', updateFormFields);
+
+        function updateFormFields() {
+            teamPickDiv.classList.add('hidden');
+            spreadDiv.classList.add('hidden');
+            overUnderDiv.classList.add('hidden');
+            teamPickSelect.innerHTML = '<option value="">Select team</option>';
+            spreadSelect.innerHTML = '<option value="">Select spread</option>';
+
+            const type = betTypeSelect.value;
+            const matchup = matchupSelect.value;
+
+            if (!type || !matchup) return;
+
+            const teams = getTeamsFromMatchup(matchup);
+            teams.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.text = team;
+                teamPickSelect.appendChild(option);
+            });
+
+            if (type === 'Moneyline' || type === 'Spread') {
+                teamPickDiv.classList.remove('hidden');
+            }
+
+            if (type === 'Spread') {
+                spreadDiv.classList.remove('hidden');
+                for (let i = -14.5; i <= 14.5; i += 0.5) {
+                    if (i === -0.5 || i === 0 || i === 0.5) continue;
+                    const value = i === 0 ? 'Default' : (i > 0 ? '+' + i.toFixed(1) : i.toFixed(1));
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.text = value;
+                    spreadSelect.appendChild(option);
+                }
+            }
+
+            if (type === 'Over/Under') {
+                overUnderDiv.classList.remove('hidden');
+            }
+        }
 
         // Listen for data changes
         picksRef.on('value', (snapshot) => {
@@ -286,24 +351,41 @@
             const team = document.getElementById('teamSelect').value;
             const matchup = document.getElementById('matchupSelect').value;
             const type = document.getElementById('betTypeSelect').value;
-            const details = document.getElementById('detailsInput').value.trim();
+            let details = '';
             const result = document.getElementById('result');
 
-            if (!team || !matchup || !type || !details) {
-                result.textContent = 'Please fill all fields.';
+            if (!team || !matchup || !type) {
+                result.textContent = 'Please fill the first three fields.';
                 return;
             }
 
-            // Relaxed validation to allow abbreviations
-            if (type === 'Spread' && !/^[A-Za-z\s]+[+-]\d+(\.\d+)?$/.test(details) && !/^([A-Z]{2,3})\s[+-]\d+(\.\d+)?$/.test(details)) {
-                result.textContent = 'Spread must be like "Packers -3.5", "Green Bay -3.5", or "GB -3.5".';
-                return;
-            } else if (type === 'Moneyline' && !/^[A-Za-z\s]+$/.test(details) && !/^[A-Z]{2,3}$/.test(details)) {
-                result.textContent = 'Moneyline must be a team name like "Packers", "Green Bay", or "GB".';
-                return;
-            } else if (type === 'Over/Under' && !/^(Over|Under)\s\d+(\.\d+)?$/.test(details)) {
-                result.textContent = 'Over/Under must be like "Over 45.5".';
-                return;
+            const teams = getTeamsFromMatchup(matchup);
+
+            if (type === 'Moneyline') {
+                const pickedTeam = document.getElementById('teamPickSelect').value;
+                if (!pickedTeam || !teams.includes(pickedTeam)) {
+                    result.textContent = 'Invalid team for Moneyline.';
+                    return;
+                }
+                details = getAbbr(pickedTeam);
+            } else if (type === 'Spread') {
+                const pickedTeam = document.getElementById('teamPickSelect').value;
+                const spread = document.getElementById('spreadSelect').value;
+                if (!pickedTeam || !teams.includes(pickedTeam) || !spread) {
+                    result.textContent = 'Invalid team or spread for Spread.';
+                    return;
+                }
+                const spreadDisplay = spread === 'Default' ? 'Default' : spread;
+                details = getAbbr(pickedTeam) + ' ' + spreadDisplay;
+            } else if (type === 'Over/Under') {
+                const ou = document.getElementById('overUnderSelect').value;
+                let total = document.getElementById('totalInput').value.trim().toLowerCase();
+                if (!ou || !total) {
+                    result.textContent = 'Invalid Over/Under or total.';
+                    return;
+                }
+                if (['x', 'default'].includes(total)) total = 'Default';
+                details = ou + ' ' + total.toUpperCase();
             }
 
             const timestamp = new Date().toLocaleString();
