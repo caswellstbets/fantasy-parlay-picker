@@ -23,7 +23,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
-    <h2>Fantasy Parlay Picks - Week X</h2>
+    <h2>Fantasy Parlay Picks - Week 2</h2>
     
     <h3>Availability Grid (Green = Open, Red = Picked)</h3>
     <table id="gridTable">
@@ -101,24 +101,24 @@
         const db = firebase.database();
         const picksRef = db.ref('picks');
 
-        // Hardcode matchups for the week (update manually each week)
+        // Hardcode matchups for the week (update manually each week) - order matches the image
         const matchups = [
-            "Buffalo @ Miami",
-            "New Orleans @ Dallas",
-            "Tampa Bay @ Detroit",
-            "Indianapolis @ Green Bay",
-            "New York Jets @ Tennessee",
-            "San Francisco @ Minnesota",
-            "Seattle @ New England",
-            "New York Giants @ Washington",
-            "Los Angeles Chargers @ Carolina",
-            "Cleveland @ Jacksonville",
-            "Las Vegas @ Baltimore",
-            "Los Angeles Rams @ Arizona",
-            "Pittsburgh @ Denver",
-            "Cincinnati @ Kansas City",
-            "Chicago @ Houston",
-            "Atlanta @ Philadelphia"
+            "Washington @ Green Bay",
+            "Jacksonville @ Cincinnati",
+            "New York @ Dallas",
+            "Chicago @ Detroit",
+            "Los Angeles @ Tennessee",
+            "New England @ Miami",
+            "San Francisco @ New Orleans",
+            "Buffalo @ New York",
+            "Seattle @ Pittsburgh",
+            "Cleveland @ Baltimore",
+            "Denver @ Indianapolis",
+            "Carolina @ Arizona",
+            "Philadelphia @ Kansas City",
+            "Atlanta @ Minnesota",
+            "Tampa Bay @ Houston",
+            "Los Angeles @ Las Vegas"
         ];
 
         // NFL team synonyms to abbreviation mapping (full names, city names, and abbreviations)
@@ -131,21 +131,21 @@
             "Detroit": "DET", "Lions": "DET", "DET": "DET",
             "Indianapolis": "IND", "Colts": "IND", "IND": "IND",
             "Green Bay": "GB", "Packers": "GB", "GB": "GB",
-            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ",
+            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ", "New York": "NYJ", // For Jets context
             "Tennessee": "TEN", "Titans": "TEN", "TEN": "TEN",
             "San Francisco": "SF", "49ers": "SF", "SF": "SF",
             "Minnesota": "MIN", "Vikings": "MIN", "MIN": "MIN",
             "Seattle": "SEA", "Seahawks": "SEA", "SEA": "SEA",
             "New England": "NE", "Patriots": "NE", "NE": "NE",
-            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG",
+            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG", "New York": "NYG", // For Giants context (overridden per matchup)
             "Washington": "WAS", "Commanders": "WAS", "WAS": "WAS",
-            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC",
+            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC", "Los Angeles": "LAC", // For Chargers context
             "Carolina": "CAR", "Panthers": "CAR", "CAR": "CAR",
             "Cleveland": "CLE", "Browns": "CLE", "CLE": "CLE",
             "Jacksonville": "JAX", "Jaguars": "JAX", "JAX": "JAX",
             "Las Vegas": "LV", "Raiders": "LV", "LV": "LV",
             "Baltimore": "BAL", "Ravens": "BAL", "BAL": "BAL",
-            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR",
+            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR", "Los Angeles": "LAR", // For Rams context (overridden per matchup)
             "Arizona": "ARI", "Cardinals": "ARI", "ARI": "ARI",
             "Pittsburgh": "PIT", "Steelers": "PIT", "PIT": "PIT",
             "Denver": "DEN", "Broncos": "DEN", "DEN": "DEN",
@@ -168,6 +168,12 @@
             return "UNK"; // Unknown if no match
         }
 
+        // Function to abbreviate a full matchup
+        function abbreviateMatchup(m) {
+            const [away, home] = m.split(' @ ');
+            return getAbbr(away) + ' @ ' + getAbbr(home);
+        }
+
         // Function to parse NFL team from details based on type
         function parseNflTeamFromDetails(details, type, matchup) {
             details = details.trim();
@@ -181,13 +187,18 @@
                 if (match) teamName = match[1].trim();
             } else if (type === "Over/Under") {
                 // Default to home team for totals
-                const homeTeam = matchup.split(" @ ")[1].split(" ")[0];
+                const homeTeam = matchup.split(" @ ")[1].trim();
                 teamName = homeTeam;
             }
             return getAbbr(teamName);
         }
 
-        // Populate matchup dropdown
+        // Function to get first 5 letters of fantasy team name, ignoring ' and .
+        function getFirstFiveLetters(teamName) {
+            return teamName.replace(/['.]/g, '').slice(0, 5);
+        }
+
+        // Populate matchup dropdown with full names
         const matchupSelect = document.getElementById('matchupSelect');
         matchups.forEach(m => {
             const option = document.createElement('option');
@@ -196,11 +207,11 @@
             matchupSelect.appendChild(option);
         });
 
-        // Add matchup columns to grid header (full names)
+        // Add matchup columns to grid header with abbreviations
         const headerRow = document.getElementById('gridTable').querySelector('thead tr');
         matchups.forEach(m => {
             const th = document.createElement('th');
-            th.textContent = m;
+            th.textContent = abbreviateMatchup(m);
             headerRow.appendChild(th);
         });
 
@@ -220,34 +231,34 @@
             overUnderRow.innerHTML = '<td>Over/Under</td>';
 
             matchups.forEach(m => {
-                let pickedNflAbbrMoneyline = null, pickedNflAbbrSpread = null, pickedNflAbbrOverUnder = null;
-                Object.values(data).forEach(p => {
+                let pickedFantasyTeamMoneyline = null, pickedFantasyTeamSpread = null, pickedFantasyTeamOverUnder = null;
+                Object.entries(data).forEach(([team, p]) => {
                     if (p && p.matchup === m) {
-                        if (p.type === 'Moneyline' && !pickedNflAbbrMoneyline) {
-                            pickedNflAbbrMoneyline = parseNflTeamFromDetails(p.details, 'Moneyline', m);
+                        if (p.type === 'Moneyline' && !pickedFantasyTeamMoneyline) {
+                            pickedFantasyTeamMoneyline = team;
                         }
-                        if (p.type === 'Spread' && !pickedNflAbbrSpread) {
-                            pickedNflAbbrSpread = parseNflTeamFromDetails(p.details, 'Spread', m);
+                        if (p.type === 'Spread' && !pickedFantasyTeamSpread) {
+                            pickedFantasyTeamSpread = team;
                         }
-                        if (p.type === 'Over/Under' && !pickedNflAbbrOverUnder) {
-                            pickedNflAbbrOverUnder = parseNflTeamFromDetails(p.details, 'Over/Under', m);
+                        if (p.type === 'Over/Under' && !pickedFantasyTeamOverUnder) {
+                            pickedFantasyTeamOverUnder = team;
                         }
                     }
                 });
 
                 const mlTd = document.createElement('td');
-                mlTd.className = pickedNflAbbrMoneyline && pickedNflAbbrMoneyline !== "UNK" ? 'red' : 'green';
-                mlTd.textContent = pickedNflAbbrMoneyline && pickedNflAbbrMoneyline !== "UNK" ? pickedNflAbbrMoneyline : 'Open';
+                mlTd.className = pickedFantasyTeamMoneyline ? 'red' : 'green';
+                mlTd.textContent = pickedFantasyTeamMoneyline ? getFirstFiveLetters(pickedFantasyTeamMoneyline) : 'Open';
                 moneylineRow.appendChild(mlTd);
 
                 const spTd = document.createElement('td');
-                spTd.className = pickedNflAbbrSpread && pickedNflAbbrSpread !== "UNK" ? 'red' : 'green';
-                spTd.textContent = pickedNflAbbrSpread && pickedNflAbbrSpread !== "UNK" ? pickedNflAbbrSpread : 'Open';
+                spTd.className = pickedFantasyTeamSpread ? 'red' : 'green';
+                spTd.textContent = pickedFantasyTeamSpread ? getFirstFiveLetters(pickedFantasyTeamSpread) : 'Open';
                 spreadRow.appendChild(spTd);
 
                 const ouTd = document.createElement('td');
-                ouTd.className = pickedNflAbbrOverUnder && pickedNflAbbrOverUnder !== "UNK" ? 'red' : 'green';
-                ouTd.textContent = pickedNflAbbrOverUnder && pickedNflAbbrOverUnder !== "UNK" ? pickedNflAbbrOverUnder : 'Open';
+                ouTd.className = pickedFantasyTeamOverUnder ? 'red' : 'green';
+                ouTd.textContent = pickedFantasyTeamOverUnder ? getFirstFiveLetters(pickedFantasyTeamOverUnder) : 'Open';
                 overUnderRow.appendChild(ouTd);
             });
         }
