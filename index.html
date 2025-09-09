@@ -97,7 +97,7 @@
                 <option value="Over">Over</option>
                 <option value="Under">Under</option>
             </select>
-            <input type="text" id="totalInput" value="X" placeholder="Total (X = default)">
+            <input type="text" id="totalInput" value="Default" placeholder="Total (Default = default)">
         </div>
         <button onclick="submitPick()">Submit Pick</button>
         <p id="result"></p>
@@ -208,6 +208,14 @@
             return getAbbr(input) !== "UNK";
         }
 
+        // Sanitize key for Firebase (replace invalid chars)
+        function sanitizeKey(key) {
+            return key.replace(/[.#$[\]/]/g, '_');
+        }
+
+        // Unsanitize key for display (not needed if we store originalTeam)
+        // But we'll store originalTeam, so no unsanitize needed
+
         // Populate matchup dropdown with full names
         const matchupSelect = document.getElementById('matchupSelect');
         matchups.forEach(m => {
@@ -295,16 +303,16 @@
 
             matchups.forEach(m => {
                 let pickedFantasyTeamMoneyline = null, pickedFantasyTeamSpread = null, pickedFantasyTeamOverUnder = null;
-                Object.entries(data).forEach(([team, p]) => {
+                Object.entries(data).forEach(([sanitizedTeam, p]) => {
                     if (p && p.matchup === m) {
                         if (p.type === 'Moneyline' && !pickedFantasyTeamMoneyline) {
-                            pickedFantasyTeamMoneyline = team;
+                            pickedFantasyTeamMoneyline = p.originalTeam;
                         }
                         if (p.type === 'Spread' && !pickedFantasyTeamSpread) {
-                            pickedFantasyTeamSpread = team;
+                            pickedFantasyTeamSpread = p.originalTeam;
                         }
                         if (p.type === 'Over/Under' && !pickedFantasyTeamOverUnder) {
-                            pickedFantasyTeamOverUnder = team;
+                            pickedFantasyTeamOverUnder = p.originalTeam;
                         }
                     }
                 });
@@ -330,11 +338,11 @@
             const tbody = document.getElementById('picksTable').querySelector('tbody');
             tbody.innerHTML = '';
             const sortedEntries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
-            sortedEntries.forEach(([team, p]) => {
+            sortedEntries.forEach(([sanitizedTeam, p]) => {
                 if (p) {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${team}</td>
+                        <td>${p.originalTeam}</td>
                         <td>${p.matchup}</td>
                         <td>${p.type}</td>
                         <td>${p.details}</td>
@@ -351,13 +359,14 @@
             const type = document.getElementById('betTypeSelect').value;
             let details = '';
             const result = document.getElementById('result');
-            const [, homeTeam] = getTeamsFromMatchup(matchup);
 
             if (!team || !matchup || !type) {
                 result.textContent = 'Please fill the first three fields.';
                 return;
             }
 
+            const sanitizedTeam = sanitizeKey(team);
+            const originalTeam = team;
             const teams = getTeamsFromMatchup(matchup);
 
             if (type === 'Moneyline') {
@@ -384,19 +393,20 @@
                     return;
                 }
                 if (['X', 'x', 'default', 'Default'].includes(total.toLowerCase())) {
-                    details = ou + ' ' + getAbbr(homeTeam) + ' Default';
+                    total = 'Default';
                 } else {
                     const numTotal = parseFloat(total);
                     if (isNaN(numTotal) || numTotal <= 0) {
-                        result.textContent = 'Total must be a positive number or "X" for default.';
+                        result.textContent = 'Total must be a positive number or "Default".';
                         return;
                     }
-                    details = ou + ' ' + numTotal.toFixed(1);
+                    total = numTotal.toFixed(1);
                 }
+                details = ou + ' ' + total;
             }
 
             const timestamp = new Date().toLocaleString();
-            picksRef.child(team).set({ matchup, type, details, timestamp })
+            picksRef.child(sanitizedTeam).set({ originalTeam, matchup, type, details, timestamp })
                 .then(() => { result.textContent = 'Pick submitted!'; })
                 .catch((error) => { 
                     result.textContent = 'Error submitting pick: ' + error.message; 
