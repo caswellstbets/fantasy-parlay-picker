@@ -23,7 +23,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
-    <h2>Fantasy Parlay Picks - Week 2</h2>
+    <h2>Fantasy Parlay Picks - Week X</h2>
     
     <h3>Availability Grid (Green = Open, Red = Picked)</h3>
     <table id="gridTable">
@@ -107,3 +107,202 @@
             "New Orleans @ Dallas",
             "Tampa Bay @ Detroit",
             "Indianapolis @ Green Bay",
+            "New York Jets @ Tennessee",
+            "San Francisco @ Minnesota",
+            "Seattle @ New England",
+            "New York Giants @ Washington",
+            "Los Angeles Chargers @ Carolina",
+            "Cleveland @ Jacksonville",
+            "Las Vegas @ Baltimore",
+            "Los Angeles Rams @ Arizona",
+            "Pittsburgh @ Denver",
+            "Cincinnati @ Kansas City",
+            "Chicago @ Houston",
+            "Atlanta @ Philadelphia"
+        ];
+
+        // NFL team synonyms to abbreviation mapping (full names, city names, and abbreviations)
+        const teamAbbr = {
+            "Buffalo": "BUF", "Bills": "BUF", "BUF": "BUF",
+            "Miami": "MIA", "Dolphins": "MIA", "MIA": "MIA",
+            "New Orleans": "NO", "Saints": "NO", "NO": "NO",
+            "Dallas": "DAL", "Cowboys": "DAL", "DAL": "DAL",
+            "Tampa Bay": "TB", "Buccaneers": "TB", "TB": "TB",
+            "Detroit": "DET", "Lions": "DET", "DET": "DET",
+            "Indianapolis": "IND", "Colts": "IND", "IND": "IND",
+            "Green Bay": "GB", "Packers": "GB", "GB": "GB",
+            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ",
+            "Tennessee": "TEN", "Titans": "TEN", "TEN": "TEN",
+            "San Francisco": "SF", "49ers": "SF", "SF": "SF",
+            "Minnesota": "MIN", "Vikings": "MIN", "MIN": "MIN",
+            "Seattle": "SEA", "Seahawks": "SEA", "SEA": "SEA",
+            "New England": "NE", "Patriots": "NE", "NE": "NE",
+            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG",
+            "Washington": "WAS", "Commanders": "WAS", "WAS": "WAS",
+            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC",
+            "Carolina": "CAR", "Panthers": "CAR", "CAR": "CAR",
+            "Cleveland": "CLE", "Browns": "CLE", "CLE": "CLE",
+            "Jacksonville": "JAX", "Jaguars": "JAX", "JAX": "JAX",
+            "Las Vegas": "LV", "Raiders": "LV", "LV": "LV",
+            "Baltimore": "BAL", "Ravens": "BAL", "BAL": "BAL",
+            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR",
+            "Arizona": "ARI", "Cardinals": "ARI", "ARI": "ARI",
+            "Pittsburgh": "PIT", "Steelers": "PIT", "PIT": "PIT",
+            "Denver": "DEN", "Broncos": "DEN", "DEN": "DEN",
+            "Cincinnati": "CIN", "Bengals": "CIN", "CIN": "CIN",
+            "Kansas City": "KC", "Chiefs": "KC", "KC": "KC",
+            "Chicago": "CHI", "Bears": "CHI", "CHI": "CHI",
+            "Houston": "HOU", "Texans": "HOU", "HOU": "HOU",
+            "Atlanta": "ATL", "Falcons": "ATL", "ATL": "ATL",
+            "Philadelphia": "PHI", "Eagles": "PHI", "PHI": "PHI"
+        };
+
+        // Function to get abbreviation from any synonym
+        function getAbbr(input) {
+            const normalized = input.trim().toLowerCase();
+            for (let key in teamAbbr) {
+                if (key.toLowerCase() === normalized || (teamAbbr[key].toLowerCase() === normalized)) {
+                    return teamAbbr[key];
+                }
+            }
+            return "UNK"; // Unknown if no match
+        }
+
+        // Function to parse NFL team from details based on type
+        function parseNflTeamFromDetails(details, type, matchup) {
+            details = details.trim();
+            let teamName = "";
+            if (type === "Moneyline") {
+                // First word (could be full name, city, or abbr)
+                teamName = details.split(" ")[0];
+            } else if (type === "Spread") {
+                // Team before +/- (full name, city, or abbr)
+                const match = details.match(/^([\w\s]+?)([+-]\d+(\.\d+)?)/);
+                if (match) teamName = match[1].trim();
+            } else if (type === "Over/Under") {
+                // Default to home team for totals
+                const homeTeam = matchup.split(" @ ")[1].split(" ")[0];
+                teamName = homeTeam;
+            }
+            return getAbbr(teamName);
+        }
+
+        // Populate matchup dropdown
+        const matchupSelect = document.getElementById('matchupSelect');
+        matchups.forEach(m => {
+            const option = document.createElement('option');
+            option.value = m;
+            option.text = m;
+            matchupSelect.appendChild(option);
+        });
+
+        // Add matchup columns to grid header (full names)
+        const headerRow = document.getElementById('gridTable').querySelector('thead tr');
+        matchups.forEach(m => {
+            const th = document.createElement('th');
+            th.textContent = m;
+            headerRow.appendChild(th);
+        });
+
+        // Listen for data changes
+        picksRef.on('value', (snapshot) => {
+            const data = snapshot.val() || {};
+            updateGrid(data);
+            updatePicksTable(data);
+        });
+
+        function updateGrid(data) {
+            const moneylineRow = document.getElementById('moneylineRow');
+            const spreadRow = document.getElementById('spreadRow');
+            const overUnderRow = document.getElementById('overUnderRow');
+            moneylineRow.innerHTML = '<td>Moneyline</td>';
+            spreadRow.innerHTML = '<td>Spread</td>';
+            overUnderRow.innerHTML = '<td>Over/Under</td>';
+
+            matchups.forEach(m => {
+                let pickedNflAbbrMoneyline = null, pickedNflAbbrSpread = null, pickedNflAbbrOverUnder = null;
+                Object.values(data).forEach(p => {
+                    if (p && p.matchup === m) {
+                        if (p.type === 'Moneyline' && !pickedNflAbbrMoneyline) {
+                            pickedNflAbbrMoneyline = parseNflTeamFromDetails(p.details, 'Moneyline', m);
+                        }
+                        if (p.type === 'Spread' && !pickedNflAbbrSpread) {
+                            pickedNflAbbrSpread = parseNflTeamFromDetails(p.details, 'Spread', m);
+                        }
+                        if (p.type === 'Over/Under' && !pickedNflAbbrOverUnder) {
+                            pickedNflAbbrOverUnder = parseNflTeamFromDetails(p.details, 'Over/Under', m);
+                        }
+                    }
+                });
+
+                const mlTd = document.createElement('td');
+                mlTd.className = pickedNflAbbrMoneyline && pickedNflAbbrMoneyline !== "UNK" ? 'red' : 'green';
+                mlTd.textContent = pickedNflAbbrMoneyline && pickedNflAbbrMoneyline !== "UNK" ? pickedNflAbbrMoneyline : 'Open';
+                moneylineRow.appendChild(mlTd);
+
+                const spTd = document.createElement('td');
+                spTd.className = pickedNflAbbrSpread && pickedNflAbbrSpread !== "UNK" ? 'red' : 'green';
+                spTd.textContent = pickedNflAbbrSpread && pickedNflAbbrSpread !== "UNK" ? pickedNflAbbrSpread : 'Open';
+                spreadRow.appendChild(spTd);
+
+                const ouTd = document.createElement('td');
+                ouTd.className = pickedNflAbbrOverUnder && pickedNflAbbrOverUnder !== "UNK" ? 'red' : 'green';
+                ouTd.textContent = pickedNflAbbrOverUnder && pickedNflAbbrOverUnder !== "UNK" ? pickedNflAbbrOverUnder : 'Open';
+                overUnderRow.appendChild(ouTd);
+            });
+        }
+
+        function updatePicksTable(data) {
+            const tbody = document.getElementById('picksTable').querySelector('tbody');
+            tbody.innerHTML = '';
+            const sortedEntries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedEntries.forEach(([team, p]) => {
+                if (p) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${team}</td>
+                        <td>${p.matchup}</td>
+                        <td>${p.type}</td>
+                        <td>${p.details}</td>
+                        <td>${p.timestamp || 'N/A'}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+        }
+
+        function submitPick() {
+            const team = document.getElementById('teamSelect').value;
+            const matchup = document.getElementById('matchupSelect').value;
+            const type = document.getElementById('betTypeSelect').value;
+            const details = document.getElementById('detailsInput').value.trim();
+            const result = document.getElementById('result');
+
+            if (!team || !matchup || !type || !details) {
+                result.textContent = 'Please fill all fields.';
+                return;
+            }
+
+            // Relaxed validation to allow abbreviations
+            if (type === 'Spread' && !/^[A-Za-z\s]+[+-]\d+(\.\d+)?$/.test(details) && !/^([A-Z]{2,3})\s[+-]\d+(\.\d+)?$/.test(details)) {
+                result.textContent = 'Spread must be like "Packers -3.5", "Green Bay -3.5", or "GB -3.5".';
+                return;
+            } else if (type === 'Moneyline' && !/^[A-Za-z\s]+$/.test(details) && !/^[A-Z]{2,3}$/.test(details)) {
+                result.textContent = 'Moneyline must be a team name like "Packers", "Green Bay", or "GB".';
+                return;
+            } else if (type === 'Over/Under' && !/^(Over|Under)\s\d+(\.\d+)?$/.test(details)) {
+                result.textContent = 'Over/Under must be like "Over 45.5".';
+                return;
+            }
+
+            const timestamp = new Date().toLocaleString();
+            picksRef.child(team).set({ matchup, type, details, timestamp })
+                .then(() => { result.textContent = 'Pick submitted!'; })
+                .catch((error) => { 
+                    result.textContent = 'Error submitting pick: ' + error.message; 
+                    console.error('Firebase error:', error);
+                });
+        }
+    </script>
+</body>
+</html>
