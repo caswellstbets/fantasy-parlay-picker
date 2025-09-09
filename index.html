@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Parlay Picker</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; max-width: 100%; overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        #gridTable td { min-width: 120px; cursor: pointer; }
+        #gridTable td.green { background-color: #90ee90; color: black; } /* Light green */
+        #gridTable td.red { background-color: #ffcccb; color: black; } /* Light red */
+        #gridTable td:hover { opacity: 0.8; }
+        #form { max-width: 400px; }
+        select, input { width: 100%; margin-bottom: 10px; padding: 5px; box-sizing: border-box; }
+        button { padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; width: 100%; }
+        #result { color: red; }
+        @media (max-width: 600px) { table { font-size: 12px; } th, td { padding: 6px; } }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js"></script>
+</head>
+<body>
+    <h2>Fantasy Parlay Picks - Week X</h2>
+    
+    <h3>Availability Grid (Green = Available, Red = Picked)</h3>
+    <table id="gridTable">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <!-- Matchups will be added as columns here dynamically -->
+            </tr>
+        </thead>
+        <tbody>
+            <tr id="moneylineRow"><td>Moneyline</td></tr>
+            <tr id="spreadRow"><td>Spread</td></tr>
+            <tr id="overUnderRow"><td>Over/Under</td></tr>
+        </tbody>
+    </table>
+    
+    <h3>Current Picks</h3>
+    <table id="picksTable">
+        <thead>
+            <tr>
+                <th>Fantasy Team</th>
+                <th>Matchup</th>
+                <th>Bet Type</th>
+                <th>Details</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    
+    <h3>Make/Update Your Pick</h3>
+    <div id="form">
+        <select id="teamSelect">
+            <option value="">Select your fantasy team</option>
+            <option value="We Be Chubbin&apos;">We Be Chubbin&apos;</option>
+            <option value="Big Digg Energy">Big Digg Energy</option>
+            <option value="Blacked Out Bill">Blacked Out Bill</option>
+            <option value="Dr. Bozorgh">Dr. Bozorgh</option>
+            <option value="Dr. Gonzo&apos;s Advice">Dr. Gonzo&apos;s Advice</option>
+            <option value="Westboro Baptist Church">Westboro Baptist Church</option>
+            <option value="Glizzy Gobblers">Glizzy Gobblers</option>
+            <option value="Elder Statesman">Elder Statesman</option>
+            <option value="Beth&apos;s Divorce Attorney">Beth&apos;s Divorce Attorney</option>
+            <option value="Hawk Tua">Hawk Tua</option>
+            <option value="Little Lebowski Urban Achievers">Little Lebowski Urban Achievers</option>
+            <option value="Joe Horn&apos;s Favorite Son">Joe Horn&apos;s Favorite Son</option>
+        </select>
+        <select id="matchupSelect">
+            <option value="">Select matchup</option>
+        </select>
+        <select id="betTypeSelect">
+            <option value="">Select bet type</option>
+            <option value="Moneyline">Moneyline</option>
+            <option value="Spread">Spread</option>
+            <option value="Over/Under">Over/Under</option>
+        </select>
+        <input type="text" id="detailsInput" placeholder="Details (e.g., Packers -3.5 or Over 45.5)">
+        <button onclick="submitPick()">Submit Pick</button>
+        <p id="result"></p>
+    </div>
+
+    <script>
+        // Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const picksRef = db.ref('picks');
+
+        // Hardcode matchups for the week (update manually each week)
+        const matchups = [
+            "Buffalo @ Miami",
+            "New Orleans @ Dallas",
+            "Tampa Bay @ Detroit",
+            "Indianapolis @ Green Bay",
+            "New York Jets @ Tennessee",
+            "San Francisco @ Minnesota",
+            "Seattle @ New England",
+            "New York Giants @ Washington",
+            "Los Angeles Chargers @ Carolina",
+            "Cleveland @ Jacksonville",
+            "Las Vegas @ Baltimore",
+            "Los Angeles Rams @ Arizona",
+            "Pittsburgh @ Denver",
+            "Cincinnati @ Kansas City",
+            "Chicago @ Houston",
+            "Atlanta @ Philadelphia"
+        ];
+
+        // Populate matchup dropdown
+        const matchupSelect = document.getElementById('matchupSelect');
+        matchups.forEach(m => {
+            const option = document.createElement('option');
+            option.value = m;
+            option.text = m;
+            matchupSelect.appendChild(option);
+        });
+
+        // Add matchup columns to grid header
+        const headerRow = document.getElementById('gridTable').querySelector('thead tr');
+        matchups.forEach(m => {
+            const th = document.createElement('th');
+            th.textContent = m;
+            headerRow.appendChild(th);
+        });
+
+        // Listen for data changes
+        picksRef.on('value', (snapshot) => {
+            const data = snapshot.val() || {};
+            updateGrid(data);
+            updatePicksTable(data);
+        });
+
+        function updateGrid(data) {
+            const moneylineRow = document.getElementById('moneylineRow');
+            const spreadRow = document.getElementById('spreadRow');
+            const overUnderRow = document.getElementById('overUnderRow');
+            moneylineRow.innerHTML = '<td>Moneyline</td>';
+            spreadRow.innerHTML = '<td>Spread</td>';
+            overUnderRow.innerHTML = '<td>Over/Under</td>';
+
+            matchups.forEach(m => {
+                let hasMoneyline = false, hasSpread = false, hasOverUnder = false;
+                Object.values(data).forEach(p => {
+                    if (p && p.matchup === m) {
+                        if (p.type === 'Moneyline') hasMoneyline = true;
+                        if (p.type === 'Spread') hasSpread = true;
+                        if (p.type === 'Over/Under') hasOverUnder = true;
+                    }
+                });
+
+                const mlTd = document.createElement('td');
+                mlTd.className = hasMoneyline ? 'red' : 'green';
+                mlTd.textContent = hasMoneyline ? 'Picked' : 'Available';
+                moneylineRow.appendChild(mlTd);
+
+                const spTd = document.createElement('td');
+                spTd.className = hasSpread ? 'red' : 'green';
+                spTd.textContent = hasSpread ? 'Picked' : 'Available';
+                spreadRow.appendChild(spTd);
+
+                const ouTd = document.createElement('td');
+                ouTd.className = hasOverUnder ? 'red' : 'green';
+                ouTd.textContent = hasOverUnder ? 'Picked' : 'Available';
+                overUnderRow.appendChild(ouTd);
+            });
+        }
+
+        function updatePicksTable(data) {
+            const tbody = document.getElementById('picksTable').querySelector('tbody');
+            tbody.innerHTML = '';
+            const sortedEntries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedEntries.forEach(([team, p]) => {
+                if (p) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${team}</td>
+                        <td>${p.matchup}</td>
+                        <td>${p.type}</td>
+                        <td>${p.details}</td>
+                        <td>${p.timestamp || 'N/A'}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+        }
+
+        function submitPick() {
+            const team = document.getElementById('teamSelect').value;
+            const matchup = document.getElementById('matchupSelect').value;
+            const type = document.getElementById('betTypeSelect').value;
+            const details = document.getElementById('detailsInput').value.trim();
+            const result = document.getElementById('result');
+
+            if (!team || !matchup || !type || !details) {
+                result.textContent = 'Please fill all fields.';
+                return;
+            }
+
+            // Basic validation for details
+            if (type === 'Spread' && !/^[A-Za-z\s]+[+-]\d+(\.\d+)?$/.test(details)) {
+                result.textContent = 'Spread must be like "Packers -3.5".';
+                return;
+            } else if (type === 'Moneyline' && !/^[A-Za-z\s]+$/.test(details)) {
+                result.textContent = 'Moneyline must be a team name like "Packers".';
+                return;
+            } else if (type === 'Over/Under' && !/^(Over|Under)\s\d+(\.\d+)?$/.test(details)) {
+                result.textContent = 'Over/Under must be like "Over 45.5".';
+                return;
+            }
+
+            const timestamp = new Date().toLocaleString();
+            picksRef.child(team).set({ matchup, type, details, timestamp })
+                .then(() => { result.textContent = 'Pick submitted!'; })
+                .catch(() => { result.textContent = 'Error submitting pick.'; });
+        }
+    </script>
+</body>
+</html>
