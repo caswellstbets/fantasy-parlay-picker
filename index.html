@@ -19,8 +19,8 @@
         #result { color: red; }
         @media (max-width: 600px) { table { font-size: 12px; } th, td { padding: 6px; } }
     </style>
-    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
     <h2>Fantasy Parlay Picks - Week X</h2>
@@ -95,7 +95,7 @@
             storageBucket: "caswellstbets-c09de.firebasestorage.app",
             messagingSenderId: "502012052829",
             appId: "1:502012052829:web:f34f8ce9e0fb475d4f94b4",
-            measurementId: "G-5Y18HXVH23"     
+            measurementId: "G-5Y18HXVH23"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
@@ -226,7 +226,10 @@
             const timestamp = new Date().toLocaleString();
             picksRef.child(team).set({ matchup, type, details, timestamp })
                 .then(() => { result.textContent = 'Pick submitted!'; })
-                .catch(() => { result.textContent = 'Error submitting pick.'; });
+                .catch((error) => { 
+                    result.textContent = 'Error submitting pick: ' + error.message; 
+                    console.error('Firebase error:', error);
+                });
         }
     </script>
 </body>
