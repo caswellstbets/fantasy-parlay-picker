@@ -24,7 +24,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
-    <h2>Fantasy Parlay Picks - Week 2</h2>
+    <h2>Fantasy Parlay Picks - Week X</h2>
     
     <h3>Availability Grid (Green = Open, Red = Picked)</h3>
     <table id="gridTable">
@@ -213,9 +213,6 @@
             return key.replace(/[.#$[\]/]/g, '_');
         }
 
-        // Unsanitize key for display (not needed if we store originalTeam)
-        // But we'll store originalTeam, so no unsanitize needed
-
         // Populate matchup dropdown with full names
         const matchupSelect = document.getElementById('matchupSelect');
         matchups.forEach(m => {
@@ -286,12 +283,30 @@
             }
         }
 
-        // Listen for data changes
+        // Listen for data changes and update dropdown
         picksRef.on('value', (snapshot) => {
             const data = snapshot.val() || {};
             updateGrid(data);
             updatePicksTable(data);
+            updateMatchupDropdown(data);
         });
+
+        function updateMatchupDropdown(data) {
+            const matchupSelect = document.getElementById('matchupSelect');
+            const currentMatchup = matchupSelect.value;
+            matchupSelect.innerHTML = '<option value="">Select matchup</option>';
+            const takenMatchups = new Set(Object.values(data).map(p => p.matchup));
+            matchups.forEach(m => {
+                if (!takenMatchups.has(m)) {
+                    const option = document.createElement('option');
+                    option.value = m;
+                    option.text = m;
+                    matchupSelect.appendChild(option);
+                }
+            });
+            matchupSelect.value = currentMatchup || ''; // Retain current selection if still available
+            if (!matchupSelect.value) updateFormFields(); // Reset form if matchup is taken
+        }
 
         function updateGrid(data) {
             const moneylineRow = document.getElementById('moneylineRow');
@@ -369,49 +384,59 @@
             const originalTeam = team;
             const teams = getTeamsFromMatchup(matchup);
 
-            if (type === 'Moneyline') {
-                const pickedTeam = document.getElementById('teamPickSelect').value;
-                if (!pickedTeam || !teams.includes(pickedTeam) || !isValidTeam(pickedTeam)) {
-                    result.textContent = 'Invalid team for Moneyline.';
+            // Check if matchup is already taken
+            picksRef.once('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                const takenMatchups = new Set(Object.values(data).map(p => p.matchup));
+                if (takenMatchups.has(matchup)) {
+                    result.textContent = 'This matchup is already taken.';
                     return;
                 }
-                details = getAbbr(pickedTeam);
-            } else if (type === 'Spread') {
-                const pickedTeam = document.getElementById('teamPickSelect').value;
-                const spread = document.getElementById('spreadSelect').value;
-                if (!pickedTeam || !teams.includes(pickedTeam) || !isValidTeam(pickedTeam) || !spread) {
-                    result.textContent = 'Invalid team or spread for Spread.';
-                    return;
-                }
-                const spreadDisplay = spread === 'Default' ? 'Default' : spread;
-                details = getAbbr(pickedTeam) + ' ' + spreadDisplay;
-            } else if (type === 'Over/Under') {
-                const ou = document.getElementById('overUnderSelect').value;
-                let total = document.getElementById('totalInput').value.trim();
-                if (!ou) {
-                    result.textContent = 'Please select Over or Under.';
-                    return;
-                }
-                if (['X', 'x', 'default', 'Default'].includes(total.toLowerCase())) {
-                    total = 'Default';
-                } else {
-                    const numTotal = parseFloat(total);
-                    if (isNaN(numTotal) || numTotal <= 0) {
-                        result.textContent = 'Total must be a positive number or "Default".';
+
+                if (type === 'Moneyline') {
+                    const pickedTeam = document.getElementById('teamPickSelect').value;
+                    if (!pickedTeam || !teams.includes(pickedTeam) || !isValidTeam(pickedTeam)) {
+                        result.textContent = 'Invalid team for Moneyline.';
                         return;
                     }
-                    total = numTotal.toFixed(1);
+                    details = getAbbr(pickedTeam);
+                } else if (type === 'Spread') {
+                    const pickedTeam = document.getElementById('teamPickSelect').value;
+                    const spread = document.getElementById('spreadSelect').value;
+                    if (!pickedTeam || !teams.includes(pickedTeam) || !isValidTeam(pickedTeam) || !spread) {
+                        result.textContent = 'Invalid team or spread for Spread.';
+                        return;
+                    }
+                    const spreadDisplay = spread === 'Default' ? 'Default' : spread;
+                    details = getAbbr(pickedTeam) + ' ' + spreadDisplay;
+                } else if (type === 'Over/Under') {
+                    const ou = document.getElementById('overUnderSelect').value;
+                    let total = document.getElementById('totalInput').value.trim();
+                    if (!ou) {
+                        result.textContent = 'Please select Over or Under.';
+                        return;
+                    }
+                    if (['X', 'x', 'default', 'Default'].includes(total.toLowerCase())) {
+                        total = 'Default';
+                    } else {
+                        const numTotal = parseFloat(total);
+                        if (isNaN(numTotal) || numTotal <= 0) {
+                            result.textContent = 'Total must be a positive number or "Default".';
+                            return;
+                        }
+                        total = numTotal.toFixed(1);
+                    }
+                    details = ou + ' ' + total;
                 }
-                details = ou + ' ' + total;
-            }
 
-            const timestamp = new Date().toLocaleString();
-            picksRef.child(sanitizedTeam).set({ originalTeam, matchup, type, details, timestamp })
-                .then(() => { result.textContent = 'Pick submitted!'; })
-                .catch((error) => { 
-                    result.textContent = 'Error submitting pick: ' + error.message; 
-                    console.error('Firebase error:', error);
-                });
+                const timestamp = new Date().toLocaleString();
+                picksRef.child(sanitizedTeam).set({ originalTeam, matchup, type, details, timestamp })
+                    .then(() => { result.textContent = 'Pick submitted!'; })
+                    .catch((error) => { 
+                        result.textContent = 'Error submitting pick: ' + error.message; 
+                        console.error('Firebase error:', error);
+                    });
+            });
         }
     </script>
 </body>
