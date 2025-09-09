@@ -24,7 +24,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
-    <h2>Fantasy Parlay Picks - Week X</h2>
+    <h2>Fantasy Parlay Picks - Week 2</h2>
     
     <h3>Availability Grid (Green = Open, Red = Picked)</h3>
     <table id="gridTable">
@@ -265,7 +265,6 @@
             if (type === 'Spread') {
                 spreadDiv.classList.remove('hidden');
                 for (let i = -14.5; i <= 14.5; i += 0.5) {
-                    if (i === -0.5 || i === 0 || i === 0.5) continue;
                     const value = i === 0 ? 'Default' : (i > 0 ? '+' + i.toFixed(1) : i.toFixed(1));
                     const option = document.createElement('option');
                     option.value = value;
@@ -352,6 +351,7 @@
             const type = document.getElementById('betTypeSelect').value;
             let details = '';
             const result = document.getElementById('result');
+            const [, homeTeam] = getTeamsFromMatchup(matchup);
 
             if (!team || !matchup || !type) {
                 result.textContent = 'Please fill the first three fields.';
@@ -384,12 +384,15 @@
                     return;
                 }
                 if (['X', 'x', 'default', 'Default'].includes(total.toLowerCase())) {
-                    total = 'X';
-                } else if (isNaN(total) || total <= 0) {
-                    result.textContent = 'Total must be a positive number or "X" for default.';
-                    return;
+                    details = ou + ' ' + getAbbr(homeTeam) + ' Default';
+                } else {
+                    const numTotal = parseFloat(total);
+                    if (isNaN(numTotal) || numTotal <= 0) {
+                        result.textContent = 'Total must be a positive number or "X" for default.';
+                        return;
+                    }
+                    details = ou + ' ' + numTotal.toFixed(1);
                 }
-                details = ou + ' ' + total.toUpperCase();
             }
 
             const timestamp = new Date().toLocaleString();
