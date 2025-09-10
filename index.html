@@ -119,7 +119,7 @@
         const db = firebase.database();
         const picksRef = db.ref('picks');
 
-        // Hardcode matchups for the week (update manually each week) - order matches the image
+        // Hardcode matchups for the week - order matches the image
         const matchups = [
             "Washington @ Green Bay",
             "Jacksonville @ Cincinnati",
@@ -139,7 +139,7 @@
             "Los Angeles @ Las Vegas"
         ];
 
-        // NFL team synonyms to abbreviation mapping (full names, city names, and abbreviations)
+        // NFL team synonyms to abbreviation mapping
         const teamAbbr = {
             "Buffalo": "BUF", "Bills": "BUF", "BUF": "BUF",
             "Miami": "MIA", "Dolphins": "MIA", "MIA": "MIA",
@@ -149,21 +149,21 @@
             "Detroit": "DET", "Lions": "DET", "DET": "DET",
             "Indianapolis": "IND", "Colts": "IND", "IND": "IND",
             "Green Bay": "GB", "Packers": "GB", "GB": "GB",
-            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ", "New York": "NYJ", // For Jets context
+            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ", "New York": "NYJ",
             "Tennessee": "TEN", "Titans": "TEN", "TEN": "TEN",
             "San Francisco": "SF", "49ers": "SF", "SF": "SF",
             "Minnesota": "MIN", "Vikings": "MIN", "MIN": "MIN",
             "Seattle": "SEA", "Seahawks": "SEA", "SEA": "SEA",
             "New England": "NE", "Patriots": "NE", "NE": "NE",
-            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG", "New York": "NYG", // For Giants context (overridden per matchup)
+            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG", "New York": "NYG",
             "Washington": "WAS", "Commanders": "WAS", "WAS": "WAS",
-            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC", "Los Angeles": "LAC", // For Chargers context
+            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC", "Los Angeles": "LAC",
             "Carolina": "CAR", "Panthers": "CAR", "CAR": "CAR",
             "Cleveland": "CLE", "Browns": "CLE", "CLE": "CLE",
             "Jacksonville": "JAX", "Jaguars": "JAX", "JAX": "JAX",
             "Las Vegas": "LV", "Raiders": "LV", "LV": "LV",
             "Baltimore": "BAL", "Ravens": "BAL", "BAL": "BAL",
-            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR", "Los Angeles": "LAR", // For Rams context (overridden per matchup)
+            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR", "Los Angeles": "LAR",
             "Arizona": "ARI", "Cardinals": "ARI", "ARI": "ARI",
             "Pittsburgh": "PIT", "Steelers": "PIT", "PIT": "PIT",
             "Denver": "DEN", "Broncos": "DEN", "DEN": "DEN",
@@ -291,30 +291,47 @@
             updateMatchupDropdown(data);
         });
 
-        function updateMatchupDropdown(data) {
-            const matchupSelect = document.getElementById('matchupSelect');
-            const currentMatchup = matchupSelect.value;
-            matchupSelect.innerHTML = '<option value="">Select matchup</option>';
-            const takenMatchups = new Set(Object.values(data).map(p => p.matchup));
-            matchups.forEach(m => {
-                if (!takenMatchups.has(m)) {
-                    const option = document.createElement('option');
-                    option.value = m;
-                    option.text = m;
-                    matchupSelect.appendChild(option);
-                }
-            });
-            matchupSelect.value = currentMatchup || ''; // Retain current selection if still available
-            if (!matchupSelect.value) updateFormFields(); // Reset form if matchup is taken
-        }
-
-        function updateGrid(data) {
+        async function updateGrid(data) {
             const moneylineRow = document.getElementById('moneylineRow');
             const spreadRow = document.getElementById('spreadRow');
             const overUnderRow = document.getElementById('overUnderRow');
             moneylineRow.innerHTML = '<td>Moneyline</td>';
             spreadRow.innerHTML = '<td>Spread</td>';
             overUnderRow.innerHTML = '<td>Over/Under</td>';
+
+            // Fetch odds from The Odds API
+            let oddsData = {};
+            try {
+                const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?apiKey=bc559133e14dfb60de162502217dd275&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`);
+                if (!response.ok) throw new Error('API request failed');
+                const odds = await response.json();
+                oddsData = odds.reduce((acc, game) => {
+                    const key = `${game.away_team} @ ${game.home_team}`;
+                    acc[key] = game.bookmakers[0].markets; // Use first bookmaker (e.g., FanDuel)
+                    return acc;
+                }, {});
+            } catch (error) {
+                console.error('Error fetching odds:', error);
+                // Fallback to placeholder odds if API fails
+                oddsData = {
+                    "Washington @ Green Bay": { h2h: [{ name: "Green Bay", price: -150 }, { name: "Washington", price: 130 }], spreads: [{ name: "Green Bay", point: -3.0 }, { name: "Washington", point: 3.0 }], totals: [{ point: 45.0 }] },
+                    "Jacksonville @ Cincinnati": { h2h: [{ name: "Cincinnati", price: -200 }, { name: "Jacksonville", price: 170 }], spreads: [{ name: "Cincinnati", point: -4.0 }, { name: "Jacksonville", point: 4.0 }], totals: [{ point: 47.0 }] },
+                    "New York @ Dallas": { h2h: [{ name: "Dallas", price: -250 }, { name: "New York", price: 210 }], spreads: [{ name: "Dallas", point: -5.5 }, { name: "New York", point: 5.5 }], totals: [{ point: 43.0 }] },
+                    "Chicago @ Detroit": { h2h: [{ name: "Detroit", price: -180 }, { name: "Chicago", price: 160 }], spreads: [{ name: "Detroit", point: -3.5 }, { name: "Chicago", point: 3.5 }], totals: [{ point: 46.0 }] },
+                    "Los Angeles @ Tennessee": { h2h: [{ name: "Tennessee", price: -120 }, { name: "Los Angeles", price: 100 }], spreads: [{ name: "Tennessee", point: -1.5 }, { name: "Los Angeles", point: 1.5 }], totals: [{ point: 44.0 }] },
+                    "New England @ Miami": { h2h: [{ name: "Miami", price: -140 }, { name: "New England", price: 120 }], spreads: [{ name: "Miami", point: -2.5 }, { name: "New England", point: 2.5 }], totals: [{ point: 48.0 }] },
+                    "San Francisco @ New Orleans": { h2h: [{ name: "San Francisco", price: -170 }, { name: "New Orleans", price: 150 }], spreads: [{ name: "San Francisco", point: -3.0 }, { name: "New Orleans", point: 3.0 }], totals: [{ point: 45.5 }] },
+                    "Buffalo @ New York": { h2h: [{ name: "Buffalo", price: -200 }, { name: "New York", price: 170 }], spreads: [{ name: "Buffalo", point: -4.0 }, { name: "New York", point: 4.0 }], totals: [{ point: 42.0 }] },
+                    "Seattle @ Pittsburgh": { h2h: [{ name: "Pittsburgh", price: -130 }, { name: "Seattle", price: 110 }], spreads: [{ name: "Pittsburgh", point: -2.0 }, { name: "Seattle", point: 2.0 }], totals: [{ point: 46.5 }] },
+                    "Cleveland @ Baltimore": { h2h: [{ name: "Baltimore", price: -190 }, { name: "Cleveland", price: 160 }], spreads: [{ name: "Baltimore", point: -3.5 }, { name: "Cleveland", point: 3.5 }], totals: [{ point: 44.5 }] },
+                    "Denver @ Indianapolis": { h2h: [{ name: "Indianapolis", price: -110 }, { name: "Denver", price: -110 }], spreads: [{ name: "Indianapolis", point: -1.0 }, { name: "Denver", point: 1.0 }], totals: [{ point: 43.5 }] },
+                    "Carolina @ Arizona": { h2h: [{ name: "Arizona", price: -160 }, { name: "Carolina", price: 140 }], spreads: [{ name: "Arizona", point: -2.5 }, { name: "Carolina", point: 2.5 }], totals: [{ point: 47.5 }] },
+                    "Philadelphia @ Kansas City": { h2h: [{ name: "Kansas City", price: -220 }, { name: "Philadelphia", price: 180 }], spreads: [{ name: "Kansas City", point: -4.5 }, { name: "Philadelphia", point: 4.5 }], totals: [{ point: 46.0 }] },
+                    "Atlanta @ Minnesota": { h2h: [{ name: "Minnesota", price: -140 }, { name: "Atlanta", price: 120 }], spreads: [{ name: "Minnesota", point: -2.5 }, { name: "Atlanta", point: 2.5 }], totals: [{ point: 45.0 }] },
+                    "Tampa Bay @ Houston": { h2h: [{ name: "Tampa Bay", price: -170 }, { name: "Houston", price: 150 }], spreads: [{ name: "Tampa Bay", point: -3.0 }, { name: "Houston", point: 3.0 }], totals: [{ point: 44.0 }] },
+                    "Los Angeles @ Las Vegas": { h2h: [{ name: "Las Vegas", price: -130 }, { name: "Los Angeles", price: 110 }], spreads: [{ name: "Las Vegas", point: -2.0 }, { name: "Los Angeles", point: 2.0 }], totals: [{ point: 47.0 }] }
+                };
+            }
 
             matchups.forEach(m => {
                 let pickedFantasyTeamMoneyline = null, pickedFantasyTeamSpread = null, pickedFantasyTeamOverUnder = null;
@@ -334,17 +351,21 @@
 
                 const mlTd = document.createElement('td');
                 mlTd.className = pickedFantasyTeamMoneyline ? 'red' : 'green';
-                mlTd.textContent = pickedFantasyTeamMoneyline ? getFirstFiveLetters(pickedFantasyTeamMoneyline) : 'Open';
+                const odds = oddsData[m] || {};
+                const moneyline = odds.h2h ? odds.h2h.find(o => o.price < 0)?.name + ' ' + odds.h2h.find(o => o.price < 0)?.price : 'N/A';
+                mlTd.textContent = pickedFantasyTeamMoneyline ? getFirstFiveLetters(pickedFantasyTeamMoneyline) : moneyline !== 'N/A' ? moneyline : 'Open';
                 moneylineRow.appendChild(mlTd);
 
                 const spTd = document.createElement('td');
                 spTd.className = pickedFantasyTeamSpread ? 'red' : 'green';
-                spTd.textContent = pickedFantasyTeamSpread ? getFirstFiveLetters(pickedFantasyTeamSpread) : 'Open';
+                const spread = odds.spreads ? odds.spreads.find(o => o.point < 0)?.name + ' ' + odds.spreads.find(o => o.point < 0)?.point : 'N/A';
+                spTd.textContent = pickedFantasyTeamSpread ? getFirstFiveLetters(pickedFantasyTeamSpread) : spread !== 'N/A' ? spread : 'Open';
                 spreadRow.appendChild(spTd);
 
                 const ouTd = document.createElement('td');
                 ouTd.className = pickedFantasyTeamOverUnder ? 'red' : 'green';
-                ouTd.textContent = pickedFantasyTeamOverUnder ? getFirstFiveLetters(pickedFantasyTeamOverUnder) : 'Open';
+                const overUnder = odds.totals ? odds.totals[0]?.point : 'N/A';
+                ouTd.textContent = pickedFantasyTeamOverUnder ? getFirstFiveLetters(pickedFantasyTeamOverUnder) : overUnder !== 'N/A' ? overUnder.toFixed(1) : 'Open';
                 overUnderRow.appendChild(ouTd);
             });
         }
