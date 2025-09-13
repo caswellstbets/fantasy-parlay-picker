@@ -147,9 +147,8 @@
             logDebug("Firebase not initialized, skipping database operations.");
         }
 
-        // Hardcode matchups for Week 2 (September 11, 14, 15, 2025)
+        // Hardcode matchups for Week 2 (excluding Washington @ Green Bay)
         const matchups = [
-            "Washington @ Green Bay",
             "Jacksonville @ Cincinnati",
             "New York @ Dallas",
             "Chicago @ Detroit",
@@ -166,6 +165,25 @@
             "Tampa Bay @ Houston",
             "Los Angeles @ Las Vegas"
         ];
+
+        // Static odds based on web search (approximate for Week 2, 2025)
+        const staticOdds = {
+            "Jacksonville @ Cincinnati": { moneyline: "CIN -180", spread: "CIN -4.0", overUnder: 47.0 },
+            "New York @ Dallas": { moneyline: "DAL -250", spread: "DAL -5.5", overUnder: 43.0 },
+            "Chicago @ Detroit": { moneyline: "DET -180", spread: "DET -3.5", overUnder: 46.0 },
+            "Los Angeles @ Tennessee": { moneyline: "TEN -120", spread: "TEN -1.5", overUnder: 44.0 },
+            "New England @ Miami": { moneyline: "MIA -140", spread: "MIA -2.5", overUnder: 48.0 },
+            "San Francisco @ New Orleans": { moneyline: "SF -170", spread: "SF -3.0", overUnder: 45.5 },
+            "Buffalo @ New York": { moneyline: "BUF -200", spread: "BUF -4.0", overUnder: 42.0 },
+            "Seattle @ Pittsburgh": { moneyline: "PIT -130", spread: "PIT -2.0", overUnder: 46.5 },
+            "Cleveland @ Baltimore": { moneyline: "BAL -190", spread: "BAL -3.5", overUnder: 44.5 },
+            "Denver @ Indianapolis": { moneyline: "IND -110", spread: "IND -1.0", overUnder: 43.5 },
+            "Carolina @ Arizona": { moneyline: "ARI -160", spread: "ARI -2.5", overUnder: 47.5 },
+            "Philadelphia @ Kansas City": { moneyline: "KC -220", spread: "KC -4.5", overUnder: 46.0 },
+            "Atlanta @ Minnesota": { moneyline: "MIN -140", spread: "MIN -2.5", overUnder: 45.0 },
+            "Tampa Bay @ Houston": { moneyline: "TB -170", spread: "TB -3.0", overUnder: 44.0 },
+            "Los Angeles @ Las Vegas": { moneyline: "LV -130", spread: "LV -2.0", overUnder: 47.0 }
+        };
 
         // NFL team synonyms to abbreviation mapping
         const teamAbbr = {
@@ -340,59 +358,13 @@
             if (!matchupSelect.value) updateFormFields(); // Reset form if matchup is taken
         }
 
-        async function updateGrid(data) {
+        function updateGrid(data) {
             const moneylineRow = document.getElementById('moneylineRow');
             const spreadRow = document.getElementById('spreadRow');
             const overUnderRow = document.getElementById('overUnderRow');
             moneylineRow.innerHTML = '<td>Moneyline</td>';
             spreadRow.innerHTML = '<td>Spread</td>';
             overUnderRow.innerHTML = '<td>Over/Under</td>';
-
-            // Fetch odds from The Odds API for Week 2 (September 11, 14, 15, 2025)
-            let oddsData = {};
-            try {
-                const dates = ['2025-09-11', '2025-09-14', '2025-09-15'];
-                for (const date of dates) {
-                    const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?apiKey=bc559133e14dfb60de162502217dd275&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso&date=${date}`);
-                    if (!response.ok) {
-                        logDebug(`API request failed for ${date} with status ${response.status}`);
-                        continue;
-                    }
-                    const odds = await response.json();
-                    odds.forEach(game => {
-                        const key = `${game.away_team} @ ${game.home_team}`;
-                        if (matchups.includes(key) && !oddsData[key]) {
-                            oddsData[key] = game.bookmakers[0].markets; // Use first bookmaker (e.g., FanDuel)
-                        }
-                    });
-                }
-                if (Object.keys(oddsData).length === 0) {
-                    logDebug("No odds data retrieved from API for any date.");
-                } else {
-                    logDebug("Odds data successfully retrieved for " + Object.keys(oddsData).length + " matchups.");
-                }
-            } catch (error) {
-                logDebug("Error fetching odds: " + error.message);
-                // Fallback to placeholder odds if API fails
-                oddsData = {
-                    "Washington @ Green Bay": { h2h: [{ name: "Green Bay", price: -150 }, { name: "Washington", price: 130 }], spreads: [{ name: "Green Bay", point: -3.0 }, { name: "Washington", point: 3.0 }], totals: [{ point: 45.0 }] },
-                    "Jacksonville @ Cincinnati": { h2h: [{ name: "Cincinnati", price: -200 }, { name: "Jacksonville", price: 170 }], spreads: [{ name: "Cincinnati", point: -4.0 }, { name: "Jacksonville", point: 4.0 }], totals: [{ point: 47.0 }] },
-                    "New York @ Dallas": { h2h: [{ name: "Dallas", price: -250 }, { name: "New York", price: 210 }], spreads: [{ name: "Dallas", point: -5.5 }, { name: "New York", point: 5.5 }], totals: [{ point: 43.0 }] },
-                    "Chicago @ Detroit": { h2h: [{ name: "Detroit", price: -180 }, { name: "Chicago", price: 160 }], spreads: [{ name: "Detroit", point: -3.5 }, { name: "Chicago", point: 3.5 }], totals: [{ point: 46.0 }] },
-                    "Los Angeles @ Tennessee": { h2h: [{ name: "Tennessee", price: -120 }, { name: "Los Angeles", price: 100 }], spreads: [{ name: "Tennessee", point: -1.5 }, { name: "Los Angeles", point: 1.5 }], totals: [{ point: 44.0 }] },
-                    "New England @ Miami": { h2h: [{ name: "Miami", price: -140 }, { name: "New England", price: 120 }], spreads: [{ name: "Miami", point: -2.5 }, { name: "New England", point: 2.5 }], totals: [{ point: 48.0 }] },
-                    "San Francisco @ New Orleans": { h2h: [{ name: "San Francisco", price: -170 }, { name: "New Orleans", price: 150 }], spreads: [{ name: "San Francisco", point: -3.0 }, { name: "New Orleans", point: 3.0 }], totals: [{ point: 45.5 }] },
-                    "Buffalo @ New York": { h2h: [{ name: "Buffalo", price: -200 }, { name: "New York", price: 170 }], spreads: [{ name: "Buffalo", point: -4.0 }, { name: "New York", point: 4.0 }], totals: [{ point: 42.0 }] },
-                    "Seattle @ Pittsburgh": { h2h: [{ name: "Pittsburgh", price: -130 }, { name: "Seattle", price: 110 }], spreads: [{ name: "Pittsburgh", point: -2.0 }, { name: "Seattle", point: 2.0 }], totals: [{ point: 46.5 }] },
-                    "Cleveland @ Baltimore": { h2h: [{ name: "Baltimore", price: -190 }, { name: "Cleveland", price: 160 }], spreads: [{ name: "Baltimore", point: -3.5 }, { name: "Cleveland", point: 3.5 }], totals: [{ point: 44.5 }] },
-                    "Denver @ Indianapolis": { h2h: [{ name: "Indianapolis", price: -110 }, { name: "Denver", price: -110 }], spreads: [{ name: "Indianapolis", point: -1.0 }, { name: "Denver", point: 1.0 }], totals: [{ point: 43.5 }] },
-                    "Carolina @ Arizona": { h2h: [{ name: "Arizona", price: -160 }, { name: "Carolina", price: 140 }], spreads: [{ name: "Arizona", point: -2.5 }, { name: "Carolina", point: 2.5 }], totals: [{ point: 47.5 }] },
-                    "Philadelphia @ Kansas City": { h2h: [{ name: "Kansas City", price: -220 }, { name: "Philadelphia", price: 180 }], spreads: [{ name: "Kansas City", point: -4.5 }, { name: "Philadelphia", point: 4.5 }], totals: [{ point: 46.0 }] },
-                    "Atlanta @ Minnesota": { h2h: [{ name: "Minnesota", price: -140 }, { name: "Atlanta", price: 120 }], spreads: [{ name: "Minnesota", point: -2.5 }, { name: "Atlanta", point: 2.5 }], totals: [{ point: 45.0 }] },
-                    "Tampa Bay @ Houston": { h2h: [{ name: "Tampa Bay", price: -170 }, { name: "Houston", price: 150 }], spreads: [{ name: "Tampa Bay", point: -3.0 }, { name: "Houston", point: 3.0 }], totals: [{ point: 44.0 }] },
-                    "Los Angeles @ Las Vegas": { h2h: [{ name: "Las Vegas", price: -130 }, { name: "Los Angeles", price: 110 }], spreads: [{ name: "Las Vegas", point: -2.0 }, { name: "Los Angeles", point: 2.0 }], totals: [{ point: 47.0 }] }
-                };
-            }
 
             matchups.forEach(m => {
                 let pickedFantasyTeamMoneyline = null, pickedFantasyTeamSpread = null, pickedFantasyTeamOverUnder = null;
@@ -410,23 +382,22 @@
                     }
                 });
 
+                const odds = staticOdds[m] || { moneyline: "Open", spread: "Open", overUnder: "Open" };
                 const mlTd = document.createElement('td');
                 mlTd.className = pickedFantasyTeamMoneyline ? 'red' : 'green';
-                const odds = oddsData[m] || {};
-                const moneyline = odds.h2h ? odds.h2h.find(o => o.price < 0)?.name + ' ' + odds.h2h.find(o => o.price < 0)?.price : 'N/A';
-                mlTd.textContent = pickedFantasyTeamMoneyline ? getFirstFiveLetters(pickedFantasyTeamMoneyline) : moneyline !== 'N/A' ? moneyline : 'Open';
+                // Extract abbreviated team name from moneyline string (e.g., "CIN -180" -> "CIN")
+                const moneylineAbbr = odds.moneyline.split(' ')[0];
+                mlTd.textContent = pickedFantasyTeamMoneyline ? getFirstFiveLetters(pickedFantasyTeamMoneyline) : odds.moneyline;
                 moneylineRow.appendChild(mlTd);
 
                 const spTd = document.createElement('td');
                 spTd.className = pickedFantasyTeamSpread ? 'red' : 'green';
-                const spread = odds.spreads ? odds.spreads.find(o => o.point < 0)?.name + ' ' + odds.spreads.find(o => o.point < 0)?.point : 'N/A';
-                spTd.textContent = pickedFantasyTeamSpread ? getFirstFiveLetters(pickedFantasyTeamSpread) : spread !== 'N/A' ? spread : 'Open';
+                spTd.textContent = pickedFantasyTeamSpread ? getFirstFiveLetters(pickedFantasyTeamSpread) : odds.spread;
                 spreadRow.appendChild(spTd);
 
                 const ouTd = document.createElement('td');
                 ouTd.className = pickedFantasyTeamOverUnder ? 'red' : 'green';
-                const overUnder = odds.totals ? odds.totals[0]?.point : 'N/A';
-                ouTd.textContent = pickedFantasyTeamOverUnder ? getFirstFiveLetters(pickedFantasyTeamOverUnder) : overUnder !== 'N/A' ? overUnder.toFixed(1) : 'Open';
+                ouTd.textContent = pickedFantasyTeamOverUnder ? getFirstFiveLetters(pickedFantasyTeamOverUnder) : odds.overUnder.toString();
                 overUnderRow.appendChild(ouTd);
             });
         }
