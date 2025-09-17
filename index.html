@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy Parlay Picks - Week 3</title>
+    <title>Fantasy Parlay Picker - Week 3</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; max-width: 100%; overflow-x: auto; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
@@ -178,21 +178,21 @@
             "Detroit": "DET", "Lions": "DET", "DET": "DET",
             "Indianapolis": "IND", "Colts": "IND", "IND": "IND",
             "Green Bay": "GB", "Packers": "GB", "GB": "GB",
-            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ", "New York": "NYJ",
+            "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ",
             "Tennessee": "TEN", "Titans": "TEN", "TEN": "TEN",
             "San Francisco": "SF", "49ers": "SF", "SF": "SF",
             "Minnesota": "MIN", "Vikings": "MIN", "MIN": "MIN",
             "Seattle": "SEA", "Seahawks": "SEA", "SEA": "SEA",
             "New England": "NE", "Patriots": "NE", "NE": "NE",
-            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG", "New York": "NYG",
+            "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG",
             "Washington": "WAS", "Commanders": "WAS", "WAS": "WAS",
-            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC", "Los Angeles": "LAC",
+            "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC",
             "Carolina": "CAR", "Panthers": "CAR", "CAR": "CAR",
             "Cleveland": "CLE", "Browns": "CLE", "CLE": "CLE",
             "Jacksonville": "JAX", "Jaguars": "JAX", "JAX": "JAX",
             "Las Vegas": "LV", "Raiders": "LV", "LV": "LV",
             "Baltimore": "BAL", "Ravens": "BAL", "BAL": "BAL",
-            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR", "Los Angeles": "LAR",
+            "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR",
             "Arizona": "ARI", "Cardinals": "ARI", "ARI": "ARI",
             "Pittsburgh": "PIT", "Steelers": "PIT", "PIT": "PIT",
             "Denver": "DEN", "Broncos": "DEN", "DEN": "DEN",
@@ -218,7 +218,13 @@
         // Function to abbreviate a full matchup
         function abbreviateMatchup(m) {
             const [away, home] = m.split(' @ ');
-            return getAbbr(away) + ' @ ' + getAbbr(home);
+            const awayAbbr = getAbbr(away);
+            const homeAbbr = getAbbr(home);
+            if (awayAbbr === "UNK" || homeAbbr === "UNK") {
+                console.error(`Abbreviation not found for matchup: ${m}`);
+                return `${awayAbbr} @ ${homeAbbr}`; // Retains "UNK" for debugging
+            }
+            return `${awayAbbr} @ ${homeAbbr}`;
         }
 
         // Function to get first 5 letters of fantasy team name, ignoring ' and .
@@ -391,21 +397,19 @@
             const teamSelect = document.getElementById('teamSelect');
             const teams = Array.from(teamSelect.options).slice(1).map(option => option.value); // All teams except the empty option
 
-            // Display only Week 3 picks (currently none)
+            // Autopopulate with all fantasy teams, N/A if no pick
             teams.forEach(originalTeam => {
                 const sanitizedTeam = sanitizeKey(originalTeam);
                 const pick = data[sanitizedTeam] || { matchup: "N/A", type: "N/A", details: "N/A", timestamp: "N/A" };
-                if (pick.matchup !== "N/A") { // Only show if pick exists for Week 3
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${originalTeam}</td>
-                        <td>${pick.matchup}</td>
-                        <td>${pick.type}</td>
-                        <td>${pick.details}</td>
-                        <td>${pick.timestamp}</td>
-                    `;
-                    tbody.appendChild(row);
-                }
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${originalTeam}</td>
+                    <td>${pick.matchup}</td>
+                    <td>${pick.type}</td>
+                    <td>${pick.details}</td>
+                    <td>${pick.timestamp}</td>
+                `;
+                tbody.appendChild(row);
             });
         }
 
