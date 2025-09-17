@@ -168,40 +168,40 @@
             "Houston Texans @ Las Vegas Raiders": { moneyline: "LV -160", spread: "LV -2.5", overUnder: 45.5 }
         };
 
-        // NFL team synonyms to abbreviation mapping
+        // NFL team synonyms to abbreviation mapping (expanded for full team names)
         const teamAbbr = {
-            "Buffalo": "BUF", "Bills": "BUF", "BUF": "BUF",
-            "Miami": "MIA", "Dolphins": "MIA", "MIA": "MIA",
-            "New Orleans": "NO", "Saints": "NO", "NO": "NO",
-            "Dallas": "DAL", "Cowboys": "DAL", "DAL": "DAL",
-            "Tampa Bay": "TB", "Buccaneers": "TB", "TB": "TB",
-            "Detroit": "DET", "Lions": "DET", "DET": "DET",
-            "Indianapolis": "IND", "Colts": "IND", "IND": "IND",
-            "Green Bay": "GB", "Packers": "GB", "GB": "GB",
+            "Miami Dolphins": "MIA", "Dolphins": "MIA", "MIA": "MIA",
+            "Buffalo Bills": "BUF", "Bills": "BUF", "BUF": "BUF",
+            "New Orleans Saints": "NO", "Saints": "NO", "NO": "NO",
+            "Dallas Cowboys": "DAL", "Cowboys": "DAL", "DAL": "DAL",
+            "Tampa Bay Buccaneers": "TB", "Buccaneers": "TB", "TB": "TB",
+            "Detroit Lions": "DET", "Lions": "DET", "DET": "DET",
+            "Indianapolis Colts": "IND", "Colts": "IND", "IND": "IND",
+            "Green Bay Packers": "GB", "Packers": "GB", "GB": "GB",
             "New York Jets": "NYJ", "Jets": "NYJ", "NYJ": "NYJ",
-            "Tennessee": "TEN", "Titans": "TEN", "TEN": "TEN",
-            "San Francisco": "SF", "49ers": "SF", "SF": "SF",
-            "Minnesota": "MIN", "Vikings": "MIN", "MIN": "MIN",
-            "Seattle": "SEA", "Seahawks": "SEA", "SEA": "SEA",
-            "New England": "NE", "Patriots": "NE", "NE": "NE",
+            "Tennessee Titans": "TEN", "Titans": "TEN", "TEN": "TEN",
+            "San Francisco 49ers": "SF", "49ers": "SF", "SF": "SF",
+            "Minnesota Vikings": "MIN", "Vikings": "MIN", "MIN": "MIN",
+            "Seattle Seahawks": "SEA", "Seahawks": "SEA", "SEA": "SEA",
+            "New England Patriots": "NE", "Patriots": "NE", "NE": "NE",
             "New York Giants": "NYG", "Giants": "NYG", "NYG": "NYG",
-            "Washington": "WAS", "Commanders": "WAS", "WAS": "WAS",
+            "Washington Commanders": "WAS", "Commanders": "WAS", "WAS": "WAS",
             "Los Angeles Chargers": "LAC", "Chargers": "LAC", "LAC": "LAC",
-            "Carolina": "CAR", "Panthers": "CAR", "CAR": "CAR",
-            "Cleveland": "CLE", "Browns": "CLE", "CLE": "CLE",
-            "Jacksonville": "JAX", "Jaguars": "JAX", "JAX": "JAX",
-            "Las Vegas": "LV", "Raiders": "LV", "LV": "LV",
-            "Baltimore": "BAL", "Ravens": "BAL", "BAL": "BAL",
+            "Carolina Panthers": "CAR", "Panthers": "CAR", "CAR": "CAR",
+            "Cleveland Browns": "CLE", "Browns": "CLE", "CLE": "CLE",
+            "Jacksonville Jaguars": "JAX", "Jaguars": "JAX", "JAX": "JAX",
+            "Las Vegas Raiders": "LV", "Raiders": "LV", "LV": "LV",
+            "Baltimore Ravens": "BAL", "Ravens": "BAL", "BAL": "BAL",
             "Los Angeles Rams": "LAR", "Rams": "LAR", "LAR": "LAR",
-            "Arizona": "ARI", "Cardinals": "ARI", "ARI": "ARI",
-            "Pittsburgh": "PIT", "Steelers": "PIT", "PIT": "PIT",
-            "Denver": "DEN", "Broncos": "DEN", "DEN": "DEN",
-            "Cincinnati": "CIN", "Bengals": "CIN", "CIN": "CIN",
-            "Kansas City": "KC", "Chiefs": "KC", "KC": "KC",
-            "Chicago": "CHI", "Bears": "CHI", "CHI": "CHI",
-            "Houston": "HOU", "Texans": "HOU", "HOU": "HOU",
-            "Atlanta": "ATL", "Falcons": "ATL", "ATL": "ATL",
-            "Philadelphia": "PHI", "Eagles": "PHI", "PHI": "PHI"
+            "Arizona Cardinals": "ARI", "Cardinals": "ARI", "ARI": "ARI",
+            "Pittsburgh Steelers": "PIT", "Steelers": "PIT", "PIT": "PIT",
+            "Denver Broncos": "DEN", "Broncos": "DEN", "DEN": "DEN",
+            "Cincinnati Bengals": "CIN", "Bengals": "CIN", "CIN": "CIN",
+            "Kansas City Chiefs": "KC", "Chiefs": "KC", "KC": "KC",
+            "Chicago Bears": "CHI", "Bears": "CHI", "CHI": "CHI",
+            "Houston Texans": "HOU", "Texans": "HOU", "HOU": "HOU",
+            "Atlanta Falcons": "ATL", "Falcons": "ATL", "ATL": "ATL",
+            "Philadelphia Eagles": "PHI", "Eagles": "PHI", "PHI": "PHI"
         };
 
         // Function to get abbreviation from any synonym
@@ -212,6 +212,7 @@
                     return teamAbbr[key];
                 }
             }
+            console.error(`No abbreviation found for: ${input}`);
             return "UNK"; // Unknown if no match
         }
 
@@ -220,10 +221,6 @@
             const [away, home] = m.split(' @ ');
             const awayAbbr = getAbbr(away);
             const homeAbbr = getAbbr(home);
-            if (awayAbbr === "UNK" || homeAbbr === "UNK") {
-                console.error(`Abbreviation not found for matchup: ${m}`);
-                return `${awayAbbr} @ ${homeAbbr}`; // Retains "UNK" for debugging
-            }
             return `${awayAbbr} @ ${homeAbbr}`;
         }
 
