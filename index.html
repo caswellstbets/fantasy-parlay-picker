@@ -70,7 +70,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const picksRef = db.ref('picks/week6'); // Separate entry for Week 6
+        const picksRef = db.ref('week6'); // Separate entry for Week 6
 
         // Sanitize key for Firebase (replace invalid chars)
         function sanitizeKey(key) {
