@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy TD Scorer Picks - Week 9</title>
+    <title>Fantasy TD Scorer Picks - Week 8</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; max-width: 100%; overflow-x: auto; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
@@ -19,7 +19,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
-    <h2>Fantasy TD Scorer Picks - Week 9</h2>
+    <h2>Fantasy TD Scorer Picks - Week 8</h2>
     
     <h3>Current Picks</h3>
     <table id="picksTable">
@@ -73,9 +73,14 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const picksRef = db.ref('picks/week9'); // Separate entry for Week 9
+        const picksRef = db.ref('picks/week8'); // Separate entry for Week 8
 
-        // Hardcode NFL matchups for Week 9
+        // Sanitize key for Firebase (replace invalid chars)
+        function sanitizeKey(key) {
+            return key.replace(/[.#$[\]/]/g, '_');
+        }
+
+        // Hardcode NFL matchups for Week 8
         const matchups = [
             "Dolphins @ Falcons",
             "Bears @ Ravens",
@@ -109,16 +114,35 @@
         function updatePicksTable(data) {
             const tbody = document.getElementById('picksTable').querySelector('tbody');
             tbody.innerHTML = '';
-            const picksArray = Object.entries(data).map(([id, p]) => ({...p, id}));
-            picksArray.forEach(pick => {
+            matchups.forEach(matchup => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${pick.matchup}</td>
-                    <td>${pick.fantasyTeam}</td>
-                    <td>${pick.player}</td>
-                    <td>${pick.timestamp}</td>
+                    <td>${matchup}</td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                    <td>N/A</td>
                 `;
                 tbody.appendChild(row);
+            });
+            // Populate with existing picks
+            Object.entries(data).forEach(([id, p]) => {
+                const rows = Array.from(tbody.rows);
+                const rowIndex = rows.findIndex(row => row.cells[0].textContent === p.matchup);
+                if (rowIndex !== -1) {
+                    rows[rowIndex].cells[1].textContent = p.fantasyTeam;
+                    rows[rowIndex].cells[2].textContent = p.player;
+                    rows[rowIndex].cells[3].textContent = p.timestamp;
+                } else {
+                    // Append new row if multiple picks for the same matchup
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${p.matchup}</td>
+                        <td>${p.fantasyTeam}</td>
+                        <td>${p.player}</td>
+                        <td>${p.timestamp}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
             });
         }
 
