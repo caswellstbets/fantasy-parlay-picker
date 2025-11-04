@@ -22,7 +22,7 @@
         .radio-circle.taken { background: #dc3545; border-color: #dc3545; cursor: not-allowed; }
         @media (max-width: 600px) { table { font-size: 12px; } th, td { padding: 6px; } }
 
-        /* Crypto Section Styles */
+        /* Crypto Section */
         .crypto-container {
             background: #f9f9f9;
             border: 1px solid #eee;
@@ -41,10 +41,28 @@
         .change.negative { color: #e74c3c; }
         .loading { color: #999; font-style: italic; }
         .error { color: #e74c3c; }
-        .chart-container { margin-top: 20px; height: 300px; position: relative; }
+
+        /* Chart */
+        .chart-container {
+            margin-top: 20px;
+            height: 300px;
+            position: relative;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .chart-loading, .chart-error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.1em;
+            color: #777;
+        }
     </style>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
     <!-- Chart.js -->
@@ -52,7 +70,7 @@
 </head>
 <body>
 
-    <!-- Crypto Holdings Section -->
+    <!-- Crypto Holdings -->
     <div class="crypto-container">
         <div class="crypto-title">My Crypto Holdings</div>
         
@@ -64,6 +82,7 @@
         <div id="change-value" class="change loading">Change: Loading...</div>
         
         <div class="chart-container">
+            <div id="chart-status" class="chart-loading">Loading chart...</div>
             <canvas id="portfolioChart"></canvas>
         </div>
         
@@ -72,7 +91,7 @@
         </p>
     </div>
 
-    <!-- Fantasy Picks Section -->
+    <!-- Fantasy Picks -->
     <h2>Fantasy TD Scorer Picks - Week 10</h2>
     
     <h3>Current Picks</h3>
@@ -112,11 +131,10 @@
     </div>
 
     <script>
-        // === CRYPTO HOLDINGS SECTION ===
+        // === CRYPTO HOLDINGS ===
         const btcHolding = 0.0112;
         const ethHolding = 0.362;
         const originalCost = 2880;
-
         let chart = null;
 
         async function updateCryptoHoldings() {
@@ -124,11 +142,12 @@
             const ethEl = document.getElementById('eth-holding');
             const totalEl = document.getElementById('total-value');
             const changeEl = document.getElementById('change-value');
+            const chartStatus = document.getElementById('chart-status');
 
             try {
-                // Fetch current prices
-                const currentResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
-                const currentData = await currentResponse.json();
+                // Current prices
+                const currentRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
+                const currentData = await currentRes.json();
 
                 const btcPrice = currentData.bitcoin.usd;
                 const ethPrice = currentData.ethereum.usd;
@@ -142,132 +161,90 @@
                 const changeSign = changeAmount >= 0 ? '+' : '';
                 const changeClass = changeAmount >= 0 ? 'positive' : 'negative';
 
-                // Format with current price
-                btcEl.innerHTML = `
-                    BTC (0.0112 @ <span class="price">$${btcPrice.toLocaleString()}</span>): 
-                    <strong>$${btcValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                `;
-                ethEl.innerHTML = `
-                    ETH (0.362 @ <span class="price">$${ethPrice.toLocaleString()}</span>): 
-                    <strong>$${ethValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                `;
+                btcEl.innerHTML = `BTC (0.0112 @ <span class="price">$${btcPrice.toLocaleString()}</span>): <strong>$${btcValue.toFixed(2)}</strong>`;
+                ethEl.innerHTML = `ETH (0.362 @ <span class="price">$${ethPrice.toLocaleString()}</span>): <strong>$${ethValue.toFixed(2)}</strong>`;
+                totalEl.textContent = `Total: $${totalValue.toFixed(2)}`;
+                changeEl.innerHTML = `Change: ${changeSign}$${Math.abs(changeAmount).toFixed(2)} (${changeSign}${changePercent}%)`;
+                changeEl.className = `change ${changeClass}`;
 
-                totalEl.textContent = `Total: $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                changeEl.innerHTML = `Change: ${changeSign}$${Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changeSign}${changePercent}%)`;
-                changeEl.classList.add(changeClass);
-
-                // Remove loading
                 [btcEl, ethEl, totalEl, changeEl].forEach(el => el.classList.remove('loading'));
 
-                // Fetch historical data for chart
-                await updateChart();
-            } catch (error) {
-                btcEl.textContent = 'BTC: Error loading price';
-                ethEl.textContent = 'ETH: Error loading price';
-                totalEl.textContent = 'Total: Error';
-                changeEl.textContent = 'Change: Error';
+                // Load chart
+                await updateChart(chartStatus);
+            } catch (err) {
+                console.error("Crypto load error:", err);
+                btcEl.textContent = 'BTC: Error'; ethEl.textContent = 'ETH: Error';
+                totalEl.textContent = 'Total: Error'; changeEl.textContent = 'Change: Error';
                 [btcEl, ethEl, totalEl, changeEl].forEach(el => el.classList.add('error'));
+                chartStatus.textContent = 'Chart: Failed to load';
+                chartStatus.className = 'chart-error';
             }
         }
 
-        async function updateChart() {
+        async function updateChart(statusEl) {
             try {
-                const from = Math.floor(new Date('2024-09-06').getTime() / 1000); // September 6, 2024
+                const from = Math.floor(new Date('2025-09-06').getTime() / 1000);  // CORRECT: Sep 6, 2025
                 const to = Math.floor(Date.now() / 1000);
 
-                const btcUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
-                const ethUrl = `https://api.coingecko.com/api/v3/coins/ethereum/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+                const btcUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${from}&to=${to}&precision=2`;
+                const ethUrl = `https://api.coingecko.com/api/v3/coins/ethereum/market_chart/range?vs_currency=usd&from=${from}&to=${to}&precision=2`;
 
-                const [btcResponse, ethResponse] = await Promise.all([
-                    fetch(btcUrl),
-                    fetch(ethUrl)
-                ]);
+                const [btcRes, ethRes] = await Promise.all([fetch(btcUrl), fetch(ethUrl)]);
+                const btcData = await btcRes.json();
+                const ethData = await ethRes.json();
 
-                const btcData = await btcResponse.json();
-                const ethData = await ethResponse.json();
+                if (!btcData.prices?.length || !ethData.prices?.length) {
+                    throw new Error("No price data returned");
+                }
 
-                const labels = btcData.prices.map(p => new Date(p[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                const labels = btcData.prices.map(p => {
+                    const date = new Date(p[0]);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                });
 
                 const btcValues = btcData.prices.map(p => (btcHolding * p[1]).toFixed(2));
                 const ethValues = ethData.prices.map(p => (ethHolding * p[1]).toFixed(2));
-                const totalValues = btcData.prices.map((p, i) => (btcHolding * p[1] + ethHolding * ethData.prices[i][1]).toFixed(2));
+                const totalValues = btcData.prices.map((_, i) => 
+                    (btcHolding * btcData.prices[i][1] + ethHolding * ethData.prices[i][1]).toFixed(2)
+                );
 
                 const ctx = document.getElementById('portfolioChart').getContext('2d');
-
-                if (chart) {
-                    chart.destroy();
-                }
+                if (chart) chart.destroy();
 
                 chart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: labels,
                         datasets: [
-                            {
-                                label: 'BTC Value',
-                                data: btcValues,
-                                borderColor: '#f7931a',
-                                backgroundColor: 'rgba(247, 147, 26, 0.1)',
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 0
-                            },
-                            {
-                                label: 'ETH Value',
-                                data: ethValues,
-                                borderColor: '#627eea',
-                                backgroundColor: 'rgba(98, 126, 234, 0.1)',
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 0
-                            },
-                            {
-                                label: 'Total Portfolio',
-                                data: totalValues,
-                                borderColor: '#2ecc71',
-                                backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                                fill: false,
-                                tension: 0.3,
-                                pointRadius: 0,
-                                borderWidth: 3
-                            }
+                            { label: 'BTC Value', data: btcValues, borderColor: '#f7931a', backgroundColor: 'rgba(247,147,26,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+                            { label: 'ETH Value', data: ethValues, borderColor: '#627eea', backgroundColor: 'rgba(98,126,234,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+                            { label: 'Total', data: totalValues, borderColor: '#2ecc71', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 0, borderWidth: 3 }
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: { enabled: false }  // Disable hover
-                        },
-                        interaction: { intersect: false },
+                        plugins: { legend: { position: 'top' }, tooltip: { enabled: false } },
+                        interaction: { mode: null },
                         scales: {
-                            x: { 
-                                display: true, 
-                                ticks: { maxTicksLimit: 10 },
-                                grid: { display: false }
-                            },
-                            y: { 
-                                display: true, 
-                                beginAtZero: false,
-                                grid: { color: 'rgba(0,0,0,0.1)' }
-                            }
-                        },
-                        elements: {
-                            point: { radius: 0 }
+                            x: { ticks: { maxTicksLimit: 10 }, grid: { display: false } },
+                            y: { beginAtZero: false, grid: { color: 'rgba(0,0,0,0.05)' } }
                         }
                     }
                 });
-            } catch (error) {
-                console.error('Error loading chart data:', error);
-                // Optionally add error message to UI
+
+                statusEl.remove();
+            } catch (err) {
+                console.error("Chart error:", err);
+                statusEl.textContent = 'Chart: No data available';
+                statusEl.className = 'chart-error';
             }
         }
 
-        // Load crypto prices and chart on page load
+        // Load on start
         updateCryptoHoldings();
 
-        // === FANTASY PICKS SECTION ===
+        // === FANTASY PICKS ===
         const firebaseConfig = {
             apiKey: "AIzaSyBR5cMxwyJExTZz6iyyFHCmB_QhfDawen8",
             authDomain: "csb2-177c1.firebaseapp.com",
@@ -312,7 +289,7 @@
             tbody.innerHTML = '';
             const takenMatchups = new Set(Object.values(data).map(p => p.matchup));
 
-            matchups.forEach((matchup, index) => {
+            matchups.forEach((matchup) => {
                 const isTaken = takenMatchups.has(matchup);
                 const pick = Object.values(data).find(p => p.matchup === matchup) || { fantasyTeam: "N/A", player: "N/A", timestamp: "N/A" };
                 const row = document.createElement('tr');
@@ -328,38 +305,35 @@
             });
         }
 
-        function selectMatchup(matchup, element) {
-            const previous = document.querySelector('.radio-circle.selected');
-            if (previous) previous.classList.remove('selected');
-            element.classList.add('selected');
+        function selectMatchup(matchup, el) {
+            document.querySelectorAll('.radio-circle.selected').forEach(e => e.classList.remove('selected'));
+            el.classList.add('selected');
             selectedMatchup = matchup;
         }
 
         function submitPick() {
-            const fantasyTeam = document.getElementById('teamSelect').value;
+            const team = document.getElementById('teamSelect').value;
             const player = document.getElementById('playerInput').value.trim();
             const result = document.getElementById('result');
-            const submitBtn = document.getElementById('submitBtn');
+            const btn = document.getElementById('submitBtn');
 
-            if (!selectedMatchup || !fantasyTeam || !player) {
-                result.textContent = 'Please select a matchup, your team, and enter a player name.';
+            if (!selectedMatchup || !team || !player) {
+                result.textContent = 'Select matchup, team, and player.';
                 return;
             }
 
             const timestamp = new Date().toLocaleString();
-            picksRef.push({ matchup: selectedMatchup, fantasyTeam, player, timestamp })
-                .then(() => { 
-                    result.textContent = 'Pick submitted!'; 
-                    submitBtn.classList.add('submitted');
-                    setTimeout(() => submitBtn.classList.remove('submitted'), 2000);
+            picksRef.push({ matchup: selectedMatchup, fantasyTeam: team, player, timestamp })
+                .then(() => {
+                    result.textContent = 'Pick submitted!';
+                    btn.classList.add('submitted');
+                    setTimeout(() => btn.classList.remove('submitted'), 2000);
                     selectedMatchup = null;
                     document.getElementById('playerInput').value = '';
-                    const selectedCircle = document.querySelector('.radio-circle.selected');
-                    if (selectedCircle) selectedCircle.classList.remove('selected');
+                    document.querySelector('.radio-circle.selected')?.classList.remove('selected');
                 })
-                .catch((error) => { 
-                    result.textContent = 'Error submitting pick: ' + error.message; 
-                    console.error('Firebase error:', error);
+                .catch(err => {
+                    result.textContent = 'Error: ' + err.message;
                 });
         }
     </script>
