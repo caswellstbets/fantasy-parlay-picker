@@ -13,6 +13,7 @@
         select, input { width: 100%; margin-bottom: 10px; padding: 5px; box-sizing: border-box; }
         button { padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; width: 100%; transition: background 0.3s; }
         button.submitted { background: #7d2e78; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
         #result { color: red; }
         .radio-circle {
             width: 20px; height: 20px; border: 2px solid #aaa; border-radius: 50%; display: inline-block; cursor: pointer;
@@ -62,6 +63,19 @@
             font-size: 1.1em;
             color: #777;
         }
+        #oddsDebug {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .note { font-size: 0.8em; color: #777; margin-top: 5px; display: block; }
     </style>
 
     <!-- Firebase -->
@@ -123,9 +137,15 @@
             <option value="Little Lebowski Urban Achievers">Little Lebowski Urban Achievers</option>
             <option value="Joe Horn&apos;s Favorite Son">Joe Horn's Favorite Son</option>
         </select>
-        <input type="text" id="playerInput" placeholder="Enter NFL player name">
-        <button id="submitBtn" onclick="submitPick()">Submit Pick</button>
+
+        <div id="playerContainer">
+            <input type="text" id="playerInput" placeholder="Select a matchup first">
+        </div>
+
+        <button id="submitBtn" onclick="submitPick()" disabled>Submit Pick</button>
         <p id="result"></p>
+
+        <div id="oddsDebug">Loading ESPN odds data...</div>
     </div>
 
     <script>
@@ -266,6 +286,107 @@
         const EXTRA_MATCHUP_KEY = "extra-entry-fuckup";
         let selectedMatchup = null;
         let picksRef = null;
+        let matchupOdds = {};
+        let debugOutput = '';
+
+        // Cache: 2 min
+        function getCached(key, fetchFn, ttl = 2 * 60 * 1000) {
+            const cached = localStorage.getItem(key);
+            const last = localStorage.getItem(`${key}_time`);
+            if (cached && last && (Date.now() - parseInt(last)) < ttl) {
+                return Promise.resolve(JSON.parse(cached));
+            }
+            return fetchFn().then(data => {
+                localStorage.setItem(key, JSON.stringify(data));
+                localStorage.setItem(`${key}_time`, Date.now().toString());
+                return data;
+            }).catch(err => {
+                localStorage.removeItem(key);
+                localStorage.removeItem(`${key}_time`);
+                throw err;
+            });
+        }
+
+        async function getWeek10Events() {
+            const url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=10&season=2025&dates=20251109-20251111';
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Scoreboard: ${res.status}`);
+            return res.json();
+        }
+
+        async function getTDProps(eventId) {
+            const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${eventId}/competitions/${eventId}/propBets?lang=en&region=us`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`PropBets: ${res.status}`);
+            const data = await res.json();
+            const anytimeTD = data.items?.find(i => 
+                i.type?.toLowerCase().includes('anytime') && i.type?.toLowerCase().includes('touchdown')
+            );
+            return anytimeTD?.selections || [];
+        }
+
+        function oddsToProb(oddsStr) {
+            const odds = parseInt(oddsStr);
+            if (isNaN(odds)) return 0;
+            return odds > 0 ? 100 / (odds + 100) : Math.abs(odds) / (Math.abs(odds) + 100);
+        }
+
+        async function loadOddsData() {
+            debugOutput = "Loading ESPN odds...\n\n";
+            document.getElementById('oddsDebug').textContent = debugOutput;
+
+            try {
+                const eventsData = await getCached('espn_events', getWeek10Events);
+                const events = eventsData.events || [];
+                debugOutput += `Found ${events.length} Week 10 games.\n\n`;
+                document.getElementById('oddsDebug').textContent = debugOutput;
+
+                for (const matchup of matchups) {
+                    const [awayTeam, homeTeam] = matchup.split(' @ ');
+                    const event = events.find(e => {
+                        const comp = e.competitions?.[0];
+                        if (!comp) return false;
+                        const teams = comp.competitors.map(c => c.team?.displayName || '');
+                        return teams.some(t => t.includes(awayTeam)) && teams.some(t => t.includes(homeTeam));
+                    });
+
+                    if (!event) {
+                        debugOutput += `No event for: ${matchup}\n`;
+                        document.getElementById('oddsDebug').textContent = debugOutput;
+                        continue;
+                    }
+
+                    const eventId = event.id;
+                    debugOutput += `${matchup} (ID: ${eventId})\n`;
+
+                    const selections = await getCached(`td_${eventId}`, () => getTDProps(eventId));
+                    if (!selections.length) {
+                        debugOutput += `  No TD props.\n\n`;
+                        document.getElementById('oddsDebug').textContent = debugOutput;
+                        continue;
+                    }
+
+                    const players = selections.map(s => ({
+                        name: s.name?.trim() || 'Unknown',
+                        odds: s.odds || '—',
+                        prob: oddsToProb(s.odds)
+                    })).filter(p => p.odds !== '—');
+
+                    players.sort((a, b) => b.prob - a.prob);
+                    const top12 = players.slice(0, 12);
+
+                    matchupOdds[matchup] = top12;
+                    debugOutput += `  ${top12.length} players:\n`;
+                    top12.forEach(p => debugOutput += `    • ${p.name}, ${p.odds}\n`);
+                    debugOutput += '\n';
+                    document.getElementById('oddsDebug').textContent = debugOutput;
+                }
+            } catch (err) {
+                debugOutput += `\nERROR: ${err.message}`;
+                document.getElementById('oddsDebug').textContent = debugOutput;
+                console.error(err);
+            }
+        }
 
         function updatePicksTable(data) {
             const tbody = document.getElementById('picksTable').querySelector('tbody');
@@ -281,7 +402,6 @@
                 }
             });
 
-            // Regular matchups
             matchups.forEach((matchup) => {
                 const isTaken = takenMatchups.has(matchup);
                 const pick = Object.values(data).find(p => p.matchup === matchup) || { fantasyTeam: "N/A", player: "N/A", timestamp: "N/A" };
@@ -297,7 +417,6 @@
                 tbody.appendChild(row);
             });
 
-            // Extra entry rows
             extraPicks.forEach((pick, index) => {
                 const isLast = index === extraPicks.length - 1;
                 const key = `${EXTRA_MATCHUP_KEY}-${index}`;
@@ -314,7 +433,6 @@
                 tbody.appendChild(row);
             });
 
-            // Always show one empty extra row
             const emptyKey = `${EXTRA_MATCHUP_KEY}-${extraPicks.length}`;
             const emptyRow = document.createElement('tr');
             emptyRow.className = 'extra-row';
@@ -333,11 +451,48 @@
             document.querySelectorAll('.radio-circle.selected').forEach(e => e.classList.remove('selected'));
             el.classList.add('selected');
             selectedMatchup = matchup;
+
+            const container = document.getElementById('playerContainer');
+            container.innerHTML = '';
+            const oddsList = matchupOdds[matchup] || [];
+
+            if (oddsList.length > 0) {
+                const select = document.createElement('select');
+                select.id = 'playerSelect';
+                select.innerHTML = '<option value="">Select TD Scorer</option>';
+                oddsList.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = `${p.name}, ${p.odds}`;
+                    select.appendChild(opt);
+                });
+                container.appendChild(select);
+            } else {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = 'playerInput';
+                input.placeholder = 'Odds not available – type player';
+                container.appendChild(input);
+                const note = document.createElement('small');
+                note.className = 'note';
+                note.textContent = 'No TD odds for this game.';
+                container.appendChild(note);
+            }
+
+            toggleSubmit();
+        }
+
+        function toggleSubmit() {
+            const team = document.getElementById('teamSelect').value;
+            const playerEl = document.getElementById('playerSelect') || document.getElementById('playerInput');
+            const player = playerEl ? playerEl.value.trim() : '';
+            document.getElementById('submitBtn').disabled = !(selectedMatchup && team && player);
         }
 
         function submitPick() {
             const team = document.getElementById('teamSelect').value;
-            const player = document.getElementById('playerInput').value.trim();
+            const playerEl = document.getElementById('playerSelect') || document.getElementById('playerInput');
+            const player = playerEl.value.trim();
             const result = document.getElementById('result');
             const btn = document.getElementById('submitBtn');
 
@@ -356,8 +511,9 @@
                     btn.classList.add('submitted');
                     setTimeout(() => btn.classList.remove('submitted'), 2000);
                     selectedMatchup = null;
-                    document.getElementById('playerInput').value = '';
+                    document.getElementById('playerContainer').innerHTML = '<input type="text" id="playerInput" placeholder="Select a matchup first">';
                     document.querySelector('.radio-circle.selected')?.classList.remove('selected');
+                    toggleSubmit();
                 })
                 .catch(err => {
                     result.textContent = 'Error: ' + err.message;
@@ -366,23 +522,21 @@
 
         // === ON LOAD ===
         window.onload = function() {
-            // Initialize Firebase
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
             picksRef = db.ref('picks/week10');
 
-            // Load initial table (empty DB = all matchups shown)
             updatePicksTable({});
-
-            // Listen for real-time updates
             picksRef.on('value', (snapshot) => {
                 const data = snapshot.val() || {};
                 updatePicksTable(data);
             });
 
-            // Load crypto data
             updateCryptoHoldings();
+            loadOddsData();
+
+            document.getElementById('teamSelect').addEventListener('change', toggleSubmit);
+            document.getElementById('playerContainer').addEventListener('input', toggleSubmit);
+            document.getElementById('playerContainer').addEventListener('change', toggleSubmit);
         };
-    </script>
-</body>
-</html>
+    </script
