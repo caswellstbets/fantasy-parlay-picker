@@ -62,7 +62,7 @@
             <div id="chart-status" class="chart-loading">Loading chart...</div>
             <canvas id="portfolioChart"></canvas>
         </div>
-        <p style="font-size:0.9em; color:#777; margin-top:10px;">Updated on page load • Source: CoinG1960</p>
+        <p style="font-size:0.9em; color:#777; margin-top:10px;">Updated on page load • Source: CoinGecko</p>
     </div>
 
     <h2>Fantasy TD Scorer Picks - Week 10</h2>
@@ -390,25 +390,14 @@
         }
 
         // === ESPN ODDS ===
-        function getNFLWeek(date) {
-            const seasonStart = new Date(date.getFullYear(), 8, 1);
-            const diff = Math.floor((date - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-            return Math.max(1, Math.min(18, diff + 1));
-        }
+        const GAME_IDS = {
+            "New England Patriots @ Tampa Bay Buccaneers": "401772772",
+            // Add other game IDs here when known
+        };
 
-        async function fetchEvents(week) {
-            const year = new Date().getFullYear();
-            const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&season=${year}`;
-            log(`Fetching events: ${url}`);
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            log(`Found ${data.events?.length || 0} games.`);
-            return data;
-        }
-
-        async function getTDProps(eventId) {
-            const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${eventId}/competitions/${eventId}/propBets?lang=en&region=us`;
+        async function getTDProps(gameId) {
+            const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${gameId}/competitions/${gameId}/propBets?lang=en&region=us`;
+            log(`Fetching props: ${url}`);
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -426,27 +415,16 @@
 
         async function loadOddsData() {
             log('Starting ESPN odds fetch...');
-            try {
-                const today = new Date();
-                const week = getNFLWeek(today);
-                log(`Using NFL Week ${week} (fallback)`);
-                const eventsData = await fetchEvents(week);
-                const events = eventsData.events || [];
-
-                for (const matchup of matchups) {
-                    const [awayTeam, homeTeam] = matchup.split(' @ ');
-                    const event = events.find(e => {
-                        const teams = e.competitions[0].competitors.map(c => c.team.displayName);
-                        return teams.some(t => t.includes(awayTeam)) && teams.some(t => t.includes(homeTeam));
-                    });
-                    if (!event) {
-                        log(`No event for: ${matchup}`);
-                        continue;
-                    }
-                    log(`${matchup} (ID: ${event.id})`);
-                    const selections = await getTDProps(event.id);
+            for (const matchup of matchups) {
+                const gameId = GAME_IDS[matchup];
+                if (!gameId) {
+                    log(`No game ID for: ${matchup}`);
+                    continue;
+                }
+                try {
+                    const selections = await getTDProps(gameId);
                     if (!selections.length) {
-                        log(`  No TD props.`);
+                        log(`  No TD props for ${matchup}`);
                         continue;
                     }
                     const players = selections.map(s => ({
@@ -457,10 +435,10 @@
                     players.sort((a, b) => b.prob - a.prob);
                     const top12 = players.slice(0, 12);
                     matchupOdds[matchup] = top12;
-                    log(`  Loaded ${top12.length} players.`);
+                    log(`  Loaded ${top12.length} players for ${matchup}`);
+                } catch (err) {
+                    log(`  ERROR for ${matchup}: ${err.message}`);
                 }
-            } catch (err) {
-                log(`FATAL ERROR: ${err.message}`);
             }
         }
 
