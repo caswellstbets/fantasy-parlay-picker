@@ -41,11 +41,14 @@
         .change.negative { color: #e74c3c; }
         .loading { color: #999; font-style: italic; }
         .error { color: #e74c3c; }
+        .chart-container { margin-top: 20px; height: 300px; position: relative; }
     </style>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -59,6 +62,10 @@
         <div id="total-value" class="total loading">Total: Loading...</div>
         <div>Original Cost: $2,880</div>
         <div id="change-value" class="change loading">Change: Loading...</div>
+        
+        <div class="chart-container">
+            <canvas id="portfolioChart"></canvas>
+        </div>
         
         <p style="font-size:0.9em; color:#777; margin-top:10px;">
             Updated on page load • Source: CoinGecko
@@ -110,6 +117,8 @@
         const ethHolding = 0.362;
         const originalCost = 2880;
 
+        let chart = null;
+
         async function updateCryptoHoldings() {
             const btcEl = document.getElementById('btc-holding');
             const ethEl = document.getElementById('eth-holding');
@@ -117,11 +126,12 @@
             const changeEl = document.getElementById('change-value');
 
             try {
-                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
-                const data = await response.json();
+                // Fetch current prices
+                const currentResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
+                const currentData = await currentResponse.json();
 
-                const btcPrice = data.bitcoin.usd;
-                const ethPrice = data.ethereum.usd;
+                const btcPrice = currentData.bitcoin.usd;
+                const ethPrice = currentData.ethereum.usd;
 
                 const btcValue = btcHolding * btcPrice;
                 const ethValue = ethHolding * ethPrice;
@@ -143,11 +153,14 @@
                 `;
 
                 totalEl.textContent = `Total: $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                changeEl.textContent = `Change: ${changeSign}$${Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changeSign}${changePercent}%)`;
+                changeEl.innerHTML = `Change: ${changeSign}$${Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changeSign}${changePercent}%)`;
                 changeEl.classList.add(changeClass);
 
                 // Remove loading
                 [btcEl, ethEl, totalEl, changeEl].forEach(el => el.classList.remove('loading'));
+
+                // Fetch historical data for chart
+                await updateChart();
             } catch (error) {
                 btcEl.textContent = 'BTC: Error loading price';
                 ethEl.textContent = 'ETH: Error loading price';
@@ -157,7 +170,101 @@
             }
         }
 
-        // Load crypto prices on page load
+        async function updateChart() {
+            try {
+                const from = Math.floor(new Date('2024-09-06').getTime() / 1000); // September 6, 2024
+                const to = Math.floor(Date.now() / 1000);
+
+                const btcUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+                const ethUrl = `https://api.coingecko.com/api/v3/coins/ethereum/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+
+                const [btcResponse, ethResponse] = await Promise.all([
+                    fetch(btcUrl),
+                    fetch(ethUrl)
+                ]);
+
+                const btcData = await btcResponse.json();
+                const ethData = await ethResponse.json();
+
+                const labels = btcData.prices.map(p => new Date(p[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+
+                const btcValues = btcData.prices.map(p => (btcHolding * p[1]).toFixed(2));
+                const ethValues = ethData.prices.map(p => (ethHolding * p[1]).toFixed(2));
+                const totalValues = btcData.prices.map((p, i) => (btcHolding * p[1] + ethHolding * ethData.prices[i][1]).toFixed(2));
+
+                const ctx = document.getElementById('portfolioChart').getContext('2d');
+
+                if (chart) {
+                    chart.destroy();
+                }
+
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'BTC Value',
+                                data: btcValues,
+                                borderColor: '#f7931a',
+                                backgroundColor: 'rgba(247, 147, 26, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'ETH Value',
+                                data: ethValues,
+                                borderColor: '#627eea',
+                                backgroundColor: 'rgba(98, 126, 234, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'Total Portfolio',
+                                data: totalValues,
+                                borderColor: '#2ecc71',
+                                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                                fill: false,
+                                tension: 0.3,
+                                pointRadius: 0,
+                                borderWidth: 3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: { enabled: false }  // Disable hover
+                        },
+                        interaction: { intersect: false },
+                        scales: {
+                            x: { 
+                                display: true, 
+                                ticks: { maxTicksLimit: 10 },
+                                grid: { display: false }
+                            },
+                            y: { 
+                                display: true, 
+                                beginAtZero: false,
+                                grid: { color: 'rgba(0,0,0,0.1)' }
+                            }
+                        },
+                        elements: {
+                            point: { radius: 0 }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+                // Optionally add error message to UI
+            }
+        }
+
+        // Load crypto prices and chart on page load
         updateCryptoHoldings();
 
         // === FANTASY PICKS SECTION ===
