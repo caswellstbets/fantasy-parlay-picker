@@ -65,9 +65,9 @@
     </div>
 
     <script>
-        // Replace with your Firebase config
+        // Updated Firebase config (no measurementId)
         const firebaseConfig = {
-            apiKey: apiKey: "AIzaSyBR5cMxwyJExTZz6iyyFHCmB_QhfDawen8",
+            apiKey: "AIzaSyBR5cMxwyJExTZz6iyyFHCmB_QhfDawen8",
             authDomain: "csb2-177c1.firebaseapp.com",
             databaseURL: "https://csb2-177c1-default-rtdb.firebaseio.com",
             projectId: "csb2-177c1",
@@ -100,7 +100,7 @@
 
         // Initialize table on load
         window.onload = function() {
-            updatePicksTable({});
+            updatePicksTable({}); // Build empty table immediately
             // Listen for data changes
             picksRef.on('value', (snapshot) => {
                 const data = snapshot.val() || {};
