@@ -135,7 +135,7 @@
         const originalCost = 2880;
         let chart = null;
 
-        async function updateCryptoHoldfieHoldings() {
+        async function updateCryptoHoldings() {
             const btcEl = document.getElementById('btc-holding');
             const ethEl = document.getElementById('eth-holding');
             const totalEl = document.getElementById('total-value');
@@ -237,8 +237,6 @@
             }
         }
 
-        updateCryptoHoldings();
-
         // === FANTASY PICKS ===
         const firebaseConfig = {
             apiKey: "AIzaSyBR5cMxwyJExTZz6iyyFHCmB_QhfDawen8",
@@ -249,10 +247,6 @@
             messagingSenderId: "450797309617",
             appId: "1:450797309617:web:ce5b50e9995bfa61e55c90"
         };
-
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const picksRef = db.ref('picks/week10');
 
         const matchups = [
             "New England Patriots @ Tampa Bay Buccaneers",
@@ -271,14 +265,7 @@
 
         const EXTRA_MATCHUP_KEY = "extra-entry-fuckup";
         let selectedMatchup = null;
-
-        window.onload = function() {
-            updatePicksTable({});
-            picksRef.on('value', (snapshot) => {
-                const data = snapshot.val() || {};
-                updatePicksTable(data);
-            });
-        };
+        let picksRef = null;
 
         function updatePicksTable(data) {
             const tbody = document.getElementById('picksTable').querySelector('tbody');
@@ -376,6 +363,26 @@
                     result.textContent = 'Error: ' + err.message;
                 });
         }
+
+        // === ON LOAD ===
+        window.onload = function() {
+            // Initialize Firebase
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database();
+            picksRef = db.ref('picks/week10');
+
+            // Load initial table (empty DB = all matchups shown)
+            updatePicksTable({});
+
+            // Listen for real-time updates
+            picksRef.on('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                updatePicksTable(data);
+            });
+
+            // Load crypto data
+            updateCryptoHoldings();
+        };
     </script>
 </body>
 </html>
