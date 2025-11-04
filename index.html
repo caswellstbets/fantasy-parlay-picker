@@ -33,7 +33,8 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .crypto-title { font-size: 1.5em; margin-bottom: 15px; color: #333; }
-        .holding { font-size: 1.3em; margin: 10px 0; font-weight: bold; }
+        .holding { font-size: 1.25em; margin: 10px 0; font-weight: bold; line-height: 1.5; }
+        .price { font-weight: normal; color: #555; font-size: 0.95em; }
         .total { font-size: 1.8em; margin-top: 15px; color: #2c3e50; border-top: 2px solid #ddd; padding-top: 10px; }
         .change { font-size: 1.4em; margin-top: 10px; }
         .change.positive { color: #27ae60; }
@@ -50,12 +51,15 @@
 
     <!-- Crypto Holdings Section -->
     <div class="crypto-container">
-        <div class="crypto-title">League Crypto Holdings</div>
+        <div class="crypto-title">My Crypto Holdings</div>
+        
         <div id="btc-holding" class="holding loading">BTC: Loading...</div>
         <div id="eth-holding" class="holding loading">ETH: Loading...</div>
+        
         <div id="total-value" class="total loading">Total: Loading...</div>
         <div>Original Cost: $2,880</div>
         <div id="change-value" class="change loading">Change: Loading...</div>
+        
         <p style="font-size:0.9em; color:#777; margin-top:10px;">
             Updated on page load • Source: CoinGecko
         </p>
@@ -128,25 +132,28 @@
                 const changeSign = changeAmount >= 0 ? '+' : '';
                 const changeClass = changeAmount >= 0 ? 'positive' : 'negative';
 
-                btcEl.textContent = `BTC (0.0112): $${btcValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                ethEl.textContent = `ETH (0.362): $${ethValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                // Format with current price
+                btcEl.innerHTML = `
+                    BTC (0.0112 @ <span class="price">$${btcPrice.toLocaleString()}</span>): 
+                    <strong>$${btcValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                `;
+                ethEl.innerHTML = `
+                    ETH (0.362 @ <span class="price">$${ethPrice.toLocaleString()}</span>): 
+                    <strong>$${ethValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                `;
+
                 totalEl.textContent = `Total: $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                changeEl.textContent = `Change: ${changeSign}$${changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changeSign}${changePercent}%)`;
+                changeEl.textContent = `Change: ${changeSign}$${Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changeSign}${changePercent}%)`;
                 changeEl.classList.add(changeClass);
 
-                btcEl.classList.remove('loading');
-                ethEl.classList.remove('loading');
-                totalEl.classList.remove('loading');
-                changeEl.classList.remove('loading');
+                // Remove loading
+                [btcEl, ethEl, totalEl, changeEl].forEach(el => el.classList.remove('loading'));
             } catch (error) {
-                btcEl.textContent = 'BTC: Error';
-                ethEl.textContent = 'ETH: Error';
+                btcEl.textContent = 'BTC: Error loading price';
+                ethEl.textContent = 'ETH: Error loading price';
                 totalEl.textContent = 'Total: Error';
                 changeEl.textContent = 'Change: Error';
-                btcEl.classList.add('error');
-                ethEl.classList.add('error');
-                totalEl.classList.add('error');
-                changeEl.classList.add('error');
+                [btcEl, ethEl, totalEl, changeEl].forEach(el => el.classList.add('error'));
             }
         }
 
