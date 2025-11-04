@@ -21,11 +21,47 @@
         .radio-circle.selected { background: #4CAF50; border-color: #4CAF50; }
         .radio-circle.taken { background: #dc3545; border-color: #dc3545; cursor: not-allowed; }
         @media (max-width: 600px) { table { font-size: 12px; } th, td { padding: 6px; } }
+
+        /* Crypto Section Styles */
+        .crypto-container {
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .crypto-title { font-size: 1.5em; margin-bottom: 15px; color: #333; }
+        .holding { font-size: 1.3em; margin: 10px 0; font-weight: bold; }
+        .total { font-size: 1.8em; margin-top: 15px; color: #2c3e50; border-top: 2px solid #ddd; padding-top: 10px; }
+        .change { font-size: 1.4em; margin-top: 10px; }
+        .change.positive { color: #27ae60; }
+        .change.negative { color: #e74c3c; }
+        .loading { color: #999; font-style: italic; }
+        .error { color: #e74c3c; }
     </style>
+
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
 <body>
+
+    <!-- Crypto Holdings Section -->
+    <div class="crypto-container">
+        <div class="crypto-title">League Crypto Holdings</div>
+        <div id="btc-holding" class="holding loading">BTC: Loading...</div>
+        <div id="eth-holding" class="holding loading">ETH: Loading...</div>
+        <div id="total-value" class="total loading">Total: Loading...</div>
+        <div>Original Cost: $2,880</div>
+        <div id="change-value" class="change loading">Change: Loading...</div>
+        <p style="font-size:0.9em; color:#777; margin-top:10px;">
+            Updated on page load • Source: CoinGecko
+        </p>
+    </div>
+
+    <!-- Fantasy Picks Section -->
     <h2>Fantasy TD Scorer Picks - Week 10</h2>
     
     <h3>Current Picks</h3>
@@ -65,7 +101,59 @@
     </div>
 
     <script>
-        // Updated Firebase config (no measurementId)
+        // === CRYPTO HOLDINGS SECTION ===
+        const btcHolding = 0.0112;
+        const ethHolding = 0.362;
+        const originalCost = 2880;
+
+        async function updateCryptoHoldings() {
+            const btcEl = document.getElementById('btc-holding');
+            const ethEl = document.getElementById('eth-holding');
+            const totalEl = document.getElementById('total-value');
+            const changeEl = document.getElementById('change-value');
+
+            try {
+                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
+                const data = await response.json();
+
+                const btcPrice = data.bitcoin.usd;
+                const ethPrice = data.ethereum.usd;
+
+                const btcValue = btcHolding * btcPrice;
+                const ethValue = ethHolding * ethPrice;
+                const totalValue = btcValue + ethValue;
+
+                const changeAmount = totalValue - originalCost;
+                const changePercent = ((changeAmount / originalCost) * 100).toFixed(2);
+                const changeSign = changeAmount >= 0 ? '+' : '';
+                const changeClass = changeAmount >= 0 ? 'positive' : 'negative';
+
+                btcEl.textContent = `BTC (0.0112): $${btcValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                ethEl.textContent = `ETH (0.362): $${ethValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                totalEl.textContent = `Total: $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                changeEl.textContent = `Change: ${changeSign}$${changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changeSign}${changePercent}%)`;
+                changeEl.classList.add(changeClass);
+
+                btcEl.classList.remove('loading');
+                ethEl.classList.remove('loading');
+                totalEl.classList.remove('loading');
+                changeEl.classList.remove('loading');
+            } catch (error) {
+                btcEl.textContent = 'BTC: Error';
+                ethEl.textContent = 'ETH: Error';
+                totalEl.textContent = 'Total: Error';
+                changeEl.textContent = 'Change: Error';
+                btcEl.classList.add('error');
+                ethEl.classList.add('error');
+                totalEl.classList.add('error');
+                changeEl.classList.add('error');
+            }
+        }
+
+        // Load crypto prices on page load
+        updateCryptoHoldings();
+
+        // === FANTASY PICKS SECTION ===
         const firebaseConfig = {
             apiKey: "AIzaSyBR5cMxwyJExTZz6iyyFHCmB_QhfDawen8",
             authDomain: "csb2-177c1.firebaseapp.com",
@@ -78,9 +166,8 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const picksRef = db.ref('picks/week10'); // Separate entry for Week 10
+        const picksRef = db.ref('picks/week10');
 
-        // Hardcode NFL matchups for Week 10
         const matchups = [
             "New England Patriots @ Tampa Bay Buccaneers",
             "New York Giants @ Chicago Bears",
@@ -98,10 +185,8 @@
 
         let selectedMatchup = null;
 
-        // Initialize table on load
         window.onload = function() {
-            updatePicksTable({}); // Build empty table immediately
-            // Listen for data changes
+            updatePicksTable({});
             picksRef.on('value', (snapshot) => {
                 const data = snapshot.val() || {};
                 updatePicksTable(data);
@@ -130,10 +215,8 @@
         }
 
         function selectMatchup(matchup, element) {
-            // Deselect previous
             const previous = document.querySelector('.radio-circle.selected');
             if (previous) previous.classList.remove('selected');
-            // Select new
             element.classList.add('selected');
             selectedMatchup = matchup;
         }
@@ -157,7 +240,6 @@
                     setTimeout(() => submitBtn.classList.remove('submitted'), 2000);
                     selectedMatchup = null;
                     document.getElementById('playerInput').value = '';
-                    // Clear selected circle
                     const selectedCircle = document.querySelector('.radio-circle.selected');
                     if (selectedCircle) selectedCircle.classList.remove('selected');
                 })
