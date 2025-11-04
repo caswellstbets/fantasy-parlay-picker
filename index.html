@@ -20,6 +20,10 @@
         }
         .radio-circle.selected { background: #4CAF50; border-color: #4CAF50; }
         .radio-circle.taken { background: #dc3545; border-color: #dc3545; cursor: not-allowed; }
+        .extra-row { background-color: #fff8e1; font-style: italic; }
+        .extra-row .radio-circle { border-color: #ffb300; }
+        .extra-row .radio-circle.selected { background: #ffb300; border-color: #ffb300; }
+        .extra-row .radio-circle.taken { background: #e91e63; border-color: #e91e63; }
         @media (max-width: 600px) { table { font-size: 12px; } th, td { padding: 6px; } }
 
         /* Crypto Section */
@@ -41,8 +45,6 @@
         .change.negative { color: #e74c3c; }
         .loading { color: #999; font-style: italic; }
         .error { color: #e74c3c; }
-
-        /* Chart */
         .chart-container {
             margin-top: 20px;
             height: 300px;
@@ -73,19 +75,15 @@
     <!-- Crypto Holdings -->
     <div class="crypto-container">
         <div class="crypto-title">My Crypto Holdings</div>
-        
         <div id="btc-holding" class="holding loading">BTC: Loading...</div>
         <div id="eth-holding" class="holding loading">ETH: Loading...</div>
-        
         <div id="total-value" class="total loading">Total: Loading...</div>
         <div>Original Cost: $2,880</div>
         <div id="change-value" class="change loading">Change: Loading...</div>
-        
         <div class="chart-container">
             <div id="chart-status" class="chart-loading">Loading chart...</div>
             <canvas id="portfolioChart"></canvas>
         </div>
-        
         <p style="font-size:0.9em; color:#777; margin-top:10px;">
             Updated on page load • Source: CoinGecko
         </p>
@@ -137,7 +135,7 @@
         const originalCost = 2880;
         let chart = null;
 
-        async function updateCryptoHoldings() {
+        async function updateCryptoHoldfieHoldings() {
             const btcEl = document.getElementById('btc-holding');
             const ethEl = document.getElementById('eth-holding');
             const totalEl = document.getElementById('total-value');
@@ -145,7 +143,6 @@
             const chartStatus = document.getElementById('chart-status');
 
             try {
-                // Current prices
                 const currentRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
                 const currentData = await currentRes.json();
 
@@ -169,7 +166,6 @@
 
                 [btcEl, ethEl, totalEl, changeEl].forEach(el => el.classList.remove('loading'));
 
-                // Load chart
                 await updateChart(chartStatus);
             } catch (err) {
                 console.error("Crypto load error:", err);
@@ -183,7 +179,7 @@
 
         async function updateChart(statusEl) {
             try {
-                const from = Math.floor(new Date('2025-09-06').getTime() / 1000);  // CORRECT: Sep 6, 2025
+                const from = Math.floor(new Date('2025-09-06').getTime() / 1000);
                 const to = Math.floor(Date.now() / 1000);
 
                 const btcUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${from}&to=${to}&precision=2`;
@@ -194,7 +190,7 @@
                 const ethData = await ethRes.json();
 
                 if (!btcData.prices?.length || !ethData.prices?.length) {
-                    throw new Error("No price data returned");
+                    throw new Error("No price data");
                 }
 
                 const labels = btcData.prices.map(p => {
@@ -241,7 +237,6 @@
             }
         }
 
-        // Load on start
         updateCryptoHoldings();
 
         // === FANTASY PICKS ===
@@ -274,6 +269,7 @@
             "Philadelphia Eagles @ Green Bay Packers"
         ];
 
+        const EXTRA_MATCHUP_KEY = "extra-entry-fuckup";
         let selectedMatchup = null;
 
         window.onload = function() {
@@ -287,8 +283,18 @@
         function updatePicksTable(data) {
             const tbody = document.getElementById('picksTable').querySelector('tbody');
             tbody.innerHTML = '';
-            const takenMatchups = new Set(Object.values(data).map(p => p.matchup));
+            const takenMatchups = new Set();
+            const extraPicks = [];
 
+            Object.values(data).forEach(p => {
+                if (p.matchup === EXTRA_MATCHUP_KEY) {
+                    extraPicks.push(p);
+                } else {
+                    takenMatchups.add(p.matchup);
+                }
+            });
+
+            // Regular matchups
             matchups.forEach((matchup) => {
                 const isTaken = takenMatchups.has(matchup);
                 const pick = Object.values(data).find(p => p.matchup === matchup) || { fantasyTeam: "N/A", player: "N/A", timestamp: "N/A" };
@@ -303,6 +309,37 @@
                 `;
                 tbody.appendChild(row);
             });
+
+            // Extra entry rows
+            extraPicks.forEach((pick, index) => {
+                const isLast = index === extraPicks.length - 1;
+                const key = `${EXTRA_MATCHUP_KEY}-${index}`;
+                const row = document.createElement('tr');
+                row.className = 'extra-row';
+                row.innerHTML = `
+                    <td><div class="radio-circle ${selectedMatchup === key ? 'selected' : ''} ${!isLast ? 'taken' : ''}" 
+                         onclick="${!isLast ? '' : `selectMatchup('${key}', this)`}"></div></td>
+                    <td>Extra entry if you fucked up</td>
+                    <td>${pick.fantasyTeam}</td>
+                    <td>${pick.player}</td>
+                    <td>${pick.timestamp}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Always show one empty extra row
+            const emptyKey = `${EXTRA_MATCHUP_KEY}-${extraPicks.length}`;
+            const emptyRow = document.createElement('tr');
+            emptyRow.className = 'extra-row';
+            emptyRow.innerHTML = `
+                <td><div class="radio-circle ${selectedMatchup === emptyKey ? 'selected' : ''}" 
+                     onclick="selectMatchup('${emptyKey}', this)"></div></td>
+                <td>Extra entry if you fucked up</td>
+                <td>N/A</td>
+                <td>N/A</td>
+                <td>N/A</td>
+            `;
+            tbody.appendChild(emptyRow);
         }
 
         function selectMatchup(matchup, el) {
@@ -322,8 +359,11 @@
                 return;
             }
 
+            const isExtra = selectedMatchup.startsWith(EXTRA_MATCHUP_KEY);
+            const matchupToSave = isExtra ? EXTRA_MATCHUP_KEY : selectedMatchup;
+
             const timestamp = new Date().toLocaleString();
-            picksRef.push({ matchup: selectedMatchup, fantasyTeam: team, player, timestamp })
+            picksRef.push({ matchup: matchupToSave, fantasyTeam: team, player, timestamp })
                 .then(() => {
                     result.textContent = 'Pick submitted!';
                     btn.classList.add('submitted');
