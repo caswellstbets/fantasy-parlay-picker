@@ -20,19 +20,16 @@
     <p class="text-center text-zinc-400 mb-2">Best 4 golfers averaged • Lowest wins • $460 pot</p>
     
     <div class="flex justify-center gap-4 mb-8 flex-wrap">
-      <button onclick="manualRefresh()" 
-              class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium flex items-center gap-2">
+      <button onclick="manualRefresh()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium flex items-center gap-2">
         <i class="fas fa-sync"></i> Refresh Live Data (ESPN)
       </button>
-      <button onclick="showDebugModal()" 
-              class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium flex items-center gap-2">
+      <button onclick="showDebugModal()" class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium flex items-center gap-2">
         <i class="fas fa-bug"></i> Show Debug Info
       </button>
     </div>
 
     <div id="statusBar" class="text-center text-sm mb-6 text-zinc-400"></div>
 
-    <!-- Tabs -->
     <div class="flex border-b border-zinc-700 mb-6">
       <button onclick="switchTab(0)" id="tab0" class="tab-button px-6 py-3 font-medium border-b-2 border-blue-500 text-blue-400">Teams</button>
       <button onclick="switchTab(1)" id="tab1" class="tab-button px-6 py-3 font-medium text-zinc-400">Full Field</button>
@@ -41,8 +38,7 @@
     <!-- TEAMS TAB -->
     <div id="content0">
       <div id="simLoading" class="hidden text-center py-8 text-zinc-400">
-        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><br>
-        Running Monte Carlo simulation (~5000 runs)...
+        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><br>Running Monte Carlo simulation...
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm" id="teamsTable">
@@ -83,20 +79,18 @@
   </div>
 
   <!-- Debug Modal -->
-  <div id="debugModal" onclick="if(event.target.id==='debugModal')hideDebugModal()" 
-       class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+  <div id="debugModal" onclick="if(event.target.id==='debugModal')hideDebugModal()" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
     <div class="bg-zinc-900 rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
       <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold">🔧 Full Debug Information</h2>
-        <button onclick="hideDebugModal()" class="text-zinc-400 hover:text-white text-xl">✕</button>
+        <h2 class="text-2xl font-bold">🔧 Debug Information</h2>
+        <button onclick="hideDebugModal()" class="text-xl">✕</button>
       </div>
       <div id="debugContent" class="space-y-8 text-sm"></div>
     </div>
   </div>
 
-  <!-- Team breakdown modal (ALL golfers) -->
-  <div id="modal" onclick="if(event.target.id==='modal')closeModal()" 
-       class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+  <!-- Team Breakdown Modal -->
+  <div id="modal" onclick="if(event.target.id==='modal')closeModal()" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
     <div id="modalContent" class="bg-zinc-900 rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-auto"></div>
   </div>
 
@@ -137,8 +131,7 @@
       updateEl.textContent = "Fetching...";
 
       try {
-        const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?event=401811947&t=${Date.now()}`;
-        const res = await fetch(url);
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?event=401811947&t=${Date.now()}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
@@ -158,21 +151,22 @@
                      .replace("Joaquín Niemann", "Joaquin Niemann")
                      .replace("Christiaan Bezuidenhout", "Christian Bezuidenhout");
 
-          // Score to par
+          // To Par
           let toPar = 0;
           if (c.score !== undefined) {
             toPar = parseFloat(String(c.score).replace('+','').replace('−','-')) || 0;
           }
 
-          // IMPROVED Thru logic - number of holes played
+          // Thru - Final improved logic
           let thru = "—";
-          if (c.status?.type?.shortDetail) {
-            thru = c.status.type.shortDetail;           // e.g. "Thru 12" or "F"
+          const statusDetail = c.status?.type?.shortDetail || "";
+          if (statusDetail) {
+            thru = statusDetail;                    // "Thru 12", "F", "11:00 AM", etc.
           } else if (c.thru) {
             thru = `Thru ${c.thru}`;
           } else if (c.linescores && c.linescores.length > 0) {
-            const played = c.linescores.filter(l => l.value !== null).length;
-            thru = played > 0 ? `Thru ${played}` : "—";
+            const completed = c.linescores.filter(l => l.value != null).length;
+            thru = completed > 0 ? `Thru ${completed}` : "—";
           }
 
           playersMap.set(name, {
@@ -190,6 +184,8 @@
         console.error(e);
       }
     }
+
+    // getTeamScore, calculateWinProbabilities, renderTeams, showTeamBreakdown, renderField, etc. remain the same as the last version
 
     function getTeamScore(entry) {
       let matched = 0;
@@ -261,36 +257,29 @@
     function showTeamBreakdown(team) {
       let html = `<h3 class="text-2xl font-bold mb-6">${team.name} — Avg <span class="${team.teamAvg < 0 ? 'positive' : 'negative'}">${team.teamAvg}</span></h3>`;
       html += `<div class="space-y-4">`;
-      
       team.allScores.forEach(p => {
         const isBest = team.best4.some(b => b.name === p.name);
         html += `
-          <div class="${isBest ? 'bg-emerald-900/30 border border-emerald-500' : 'bg-zinc-800'} p-5 rounded-xl flex justify-between">
+          <div class="${isBest ? 'bg-emerald-900/30 border border-emerald-500' : 'bg-zinc-800'} p-5 rounded-xl flex justify-between items-center">
             <div>
               <div class="font-semibold">${p.name}</div>
               <div class="text-sm text-zinc-400">${p.thru}</div>
             </div>
-            <div class="text-4xl font-mono ${p.toPar < 0 ? 'positive' : p.toPar > 0 ? 'negative' : ''}">
-              ${p.toPar > 0 ? '+' : ''}${p.toPar}
-            </div>
-            ${isBest ? '<span class="text-xs self-center bg-emerald-600 px-3 py-1 rounded-full">BEST 4</span>' : ''}
+            <div class="text-4xl font-mono ${p.toPar < 0 ? 'positive' : p.toPar > 0 ? 'negative' : ''}">${p.toPar > 0 ? '+' : ''}${p.toPar}</div>
+            ${isBest ? '<span class="text-xs bg-emerald-600 px-3 py-1 rounded-full">BEST 4</span>' : ''}
           </div>`;
       });
-      
       html += `</div><button onclick="closeModal()" class="mt-8 w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-xl">Close</button>`;
       document.getElementById("modalContent").innerHTML = html;
       document.getElementById("modal").classList.remove("hidden");
     }
 
-    function closeModal() {
-      document.getElementById("modal").classList.add("hidden");
-    }
+    function closeModal() { document.getElementById("modal").classList.add("hidden"); }
 
     function renderField() {
       const tbody = document.getElementById("fieldBody");
       tbody.innerHTML = "";
-      Array.from(playersMap.entries())
-        .sort((a,b) => a[1].toPar - b[1].toPar)
+      Array.from(playersMap.entries()).sort((a,b) => a[1].toPar - b[1].toPar)
         .forEach(([name, d]) => {
           const row = document.createElement("tr");
           row.innerHTML = `
@@ -303,10 +292,7 @@
         });
     }
 
-    async function renderAll() {
-      await renderTeams();
-      renderField();
-    }
+    async function renderAll() { await renderTeams(); renderField(); }
 
     function manualRefresh() { fetchLiveData(); }
 
@@ -332,12 +318,14 @@
       });
 
       if (lastRawData) {
-        html += `<hr><div class="font-semibold">Sample Thru Data (first 8 players)</div>`;
+        html += `<hr><div class="font-semibold">Sample Thru Raw Data (first 8 players)</div>`;
         const sample = (lastRawData.events?.[0]?.competitions?.[0]?.competitors || []).slice(0,8);
         html += `<pre class="bg-black p-3 rounded-2xl overflow-auto text-[10px]">${JSON.stringify(sample.map(c => ({
           name: c.athlete?.displayName,
           score: c.score,
-          thru: c.status?.type?.shortDetail || c.thru
+          status: c.status?.type?.shortDetail,
+          thru: c.thru,
+          linescoresLength: c.linescores ? c.linescores.length : 0
         })), null, 2)}</pre>`;
       }
 
@@ -345,11 +333,9 @@
       document.getElementById("debugModal").classList.remove("hidden");
     }
 
-    function hideDebugModal() {
-      document.getElementById("debugModal").classList.add("hidden");
-    }
+    function hideDebugModal() { document.getElementById("debugModal").classList.add("hidden"); }
 
-    // Start
+    // Initial load
     fetchLiveData();
   </script>
 </body>
