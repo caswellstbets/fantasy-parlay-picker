@@ -17,28 +17,32 @@
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
   <div class="max-w-7xl mx-auto p-4">
     <h1 class="text-4xl font-bold text-center my-6">2026 PGA Championship Pool</h1>
-    <p class="text-center text-zinc-400 mb-2">Best 4 golfers averaged • Lowest wins • $460 pot</p>
-    
+    <p class="text-center text-zinc-400 mb-2">Best 4 averaged • Lowest wins • $460 pot</p>
+
     <div class="flex justify-center gap-4 mb-8 flex-wrap">
-      <button onclick="manualRefresh()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium flex items-center gap-2">
+      <button onclick="manualRefresh()" 
+              class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium flex items-center gap-2">
         <i class="fas fa-sync"></i> Refresh Live Data (ESPN)
       </button>
-      <button onclick="showDebugModal()" class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium flex items-center gap-2">
-        <i class="fas fa-bug"></i> Show Debug Info
+      <button onclick="showDebugModal()" 
+              class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium flex items-center gap-2">
+        <i class="fas fa-bug"></i> Show Debug
       </button>
     </div>
 
     <div id="statusBar" class="text-center text-sm mb-6 text-zinc-400"></div>
 
-    <div class="flex border-b border-zinc-700 mb-6">
-      <button onclick="switchTab(0)" id="tab0" class="tab-button px-6 py-3 font-medium border-b-2 border-blue-500 text-blue-400">Teams</button>
-      <button onclick="switchTab(1)" id="tab1" class="tab-button px-6 py-3 font-medium text-zinc-400">Full Field</button>
+    <!-- Tabs -->
+    <div class="flex border-b border-zinc-700 mb-6 overflow-x-auto">
+      <button onclick="switchTab(0)" id="tab0" class="tab-button px-6 py-3 font-medium border-b-2 border-blue-500 text-blue-400 whitespace-nowrap">Teams</button>
+      <button onclick="switchTab(1)" id="tab1" class="tab-button px-6 py-3 font-medium text-zinc-400 whitespace-nowrap">Full Field</button>
+      <button onclick="switchTab(2)" id="tab2" class="tab-button px-6 py-3 font-medium text-zinc-400 whitespace-nowrap">Parlay Tracker</button>
     </div>
 
     <!-- TEAMS TAB -->
     <div id="content0">
       <div id="simLoading" class="hidden text-center py-8 text-zinc-400">
-        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><br>Running Monte Carlo simulation...
+        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><br>Running Monte Carlo...
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm" id="teamsTable">
@@ -56,7 +60,7 @@
       </div>
     </div>
 
-    <!-- FIELD TAB -->
+    <!-- FULL FIELD TAB -->
     <div id="content1" class="hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm" id="fieldTable">
@@ -73,13 +77,33 @@
       </div>
     </div>
 
+    <!-- PARLAY TRACKER TAB -->
+    <div id="content2" class="hidden">
+      <h2 class="text-2xl font-bold mb-6 text-center">16 Team Parlay Tracker</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" id="parlayTable">
+          <thead>
+            <tr class="border-b border-zinc-700 bg-zinc-900">
+              <th class="text-left py-3 px-4">Player</th>
+              <th class="text-center py-3 px-4">To Par</th>
+              <th class="text-center py-3 px-4">Thru</th>
+              <th class="text-center py-3 px-4">Today</th>
+            </tr>
+          </thead>
+          <tbody id="parlayBody" class="divide-y divide-zinc-800"></tbody>
+        </table>
+      </div>
+      <p class="text-center text-xs text-zinc-500 mt-6">Live tracking of the 16 parlay players from your ticket</p>
+    </div>
+
     <div class="text-center text-xs text-zinc-500 mt-8">
       Last updated: <span id="lastUpdate">Never</span>
     </div>
   </div>
 
   <!-- Debug Modal -->
-  <div id="debugModal" onclick="if(event.target.id==='debugModal')hideDebugModal()" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+  <div id="debugModal" onclick="if(event.target.id==='debugModal')hideDebugModal()" 
+       class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
     <div class="bg-zinc-900 rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold">🔧 Debug Information</h2>
@@ -90,7 +114,8 @@
   </div>
 
   <!-- Team Breakdown Modal -->
-  <div id="modal" onclick="if(event.target.id==='modal')closeModal()" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+  <div id="modal" onclick="if(event.target.id==='modal')closeModal()" 
+       class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
     <div id="modalContent" class="bg-zinc-900 rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-auto"></div>
   </div>
 
@@ -121,6 +146,13 @@
       {name: "Nick Rosshirt", golfers: ["Scottie Scheffler","Jon Rahm","Rickie Fowler","Sam Burns","Adam Scott","Alex Fitzpatrick","Sungjae Im","Brooks Koepka","Alex Smalley","Sudarshan Yellamaraju"]}
     ];
 
+    const parlayPlayers = [
+      "Brooks Koepka", "Justin Rose", "Justin Thomas", "Rickie Fowler",
+      "Patrick Reed", "Si Woo Kim", "Viktor Hovland", "Chris Gotterup",
+      "Min Woo Lee", "Nicolai Højgaard", "Jordan Spieth", "Hideki Matsuyama",
+      "Adam Scott", "Collin Morikawa", "Patrick Cantlay", "JJ Spaun"
+    ];
+
     let playersMap = new Map();
     let lastRawData = null;
 
@@ -145,29 +177,17 @@
           let name = c.athlete?.displayName?.trim();
           if (!name) return;
 
-          // Name normalization
           name = name.replace("J.J. Spaun", "JJ Spaun")
                      .replace("J.T. Poston", "JT Poston")
                      .replace("Joaquín Niemann", "Joaquin Niemann")
                      .replace("Christiaan Bezuidenhout", "Christian Bezuidenhout");
 
-          // To Par
           let toPar = 0;
           if (c.score !== undefined) {
             toPar = parseFloat(String(c.score).replace('+','').replace('−','-')) || 0;
           }
 
-          // Thru - Final improved logic
-          let thru = "—";
-          const statusDetail = c.status?.type?.shortDetail || "";
-          if (statusDetail) {
-            thru = statusDetail;                    // "Thru 12", "F", "11:00 AM", etc.
-          } else if (c.thru) {
-            thru = `Thru ${c.thru}`;
-          } else if (c.linescores && c.linescores.length > 0) {
-            const completed = c.linescores.filter(l => l.value != null).length;
-            thru = completed > 0 ? `Thru ${completed}` : "—";
-          }
+          let thru = c.status?.type?.shortDetail || "—";
 
           playersMap.set(name, {
             toPar: toPar,
@@ -184,8 +204,6 @@
         console.error(e);
       }
     }
-
-    // getTeamScore, calculateWinProbabilities, renderTeams, showTeamBreakdown, renderField, etc. remain the same as the last version
 
     function getTeamScore(entry) {
       let matched = 0;
@@ -274,7 +292,9 @@
       document.getElementById("modal").classList.remove("hidden");
     }
 
-    function closeModal() { document.getElementById("modal").classList.add("hidden"); }
+    function closeModal() {
+      document.getElementById("modal").classList.add("hidden");
+    }
 
     function renderField() {
       const tbody = document.getElementById("fieldBody");
@@ -292,7 +312,28 @@
         });
     }
 
-    async function renderAll() { await renderTeams(); renderField(); }
+    function renderParlayTracker() {
+      const tbody = document.getElementById("parlayBody");
+      tbody.innerHTML = "";
+
+      parlayPlayers.forEach(name => {
+        const p = playersMap.get(name) || {toPar: 999, thru: "—", today: ""};
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="py-4 px-4 font-medium">${name}</td>
+          <td class="py-4 px-4 text-center font-mono text-lg ${p.toPar < 0 ? 'positive' : p.toPar > 0 ? 'negative' : ''}">${p.toPar > 0 ? '+' : ''}${p.toPar}</td>
+          <td class="py-4 px-4 text-center font-mono">${p.thru}</td>
+          <td class="py-4 px-4 text-center">${p.today}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function renderAll() {
+      await renderTeams();
+      renderField();
+      renderParlayTracker();
+    }
 
     function manualRefresh() { fetchLiveData(); }
 
@@ -304,6 +345,7 @@
       });
       document.getElementById("content0").classList.toggle("hidden", n!==0);
       document.getElementById("content1").classList.toggle("hidden", n!==1);
+      document.getElementById("content2").classList.toggle("hidden", n!==2);
     }
 
     function showDebugModal() {
@@ -317,23 +359,13 @@
         html += `<div class="flex justify-between text-xs"><span>${entry.name}</span><span class="${percent===100?'text-green-400':'text-yellow-400'}">${team.matchedCount}/${entry.golfers.length} (${percent}%)</span></div>`;
       });
 
-      if (lastRawData) {
-        html += `<hr><div class="font-semibold">Sample Thru Raw Data (first 8 players)</div>`;
-        const sample = (lastRawData.events?.[0]?.competitions?.[0]?.competitors || []).slice(0,8);
-        html += `<pre class="bg-black p-3 rounded-2xl overflow-auto text-[10px]">${JSON.stringify(sample.map(c => ({
-          name: c.athlete?.displayName,
-          score: c.score,
-          status: c.status?.type?.shortDetail,
-          thru: c.thru,
-          linescoresLength: c.linescores ? c.linescores.length : 0
-        })), null, 2)}</pre>`;
-      }
-
       content.innerHTML = html;
       document.getElementById("debugModal").classList.remove("hidden");
     }
 
-    function hideDebugModal() { document.getElementById("debugModal").classList.add("hidden"); }
+    function hideDebugModal() {
+      document.getElementById("debugModal").classList.add("hidden");
+    }
 
     // Initial load
     fetchLiveData();
