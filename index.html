@@ -11,6 +11,7 @@
     .team-row:hover { background-color: #1f2937; }
     .positive { color: #22c55e; }
     .negative { color: #ef4444; }
+    .best4 { font-size: 0.8rem; color: #a3e635; }
   </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
@@ -19,32 +20,37 @@
     <p class="text-center text-zinc-400 mb-2">Best 4 golfers averaged • Lowest wins • $460 pot</p>
     
     <div class="flex justify-center gap-4 mb-8 flex-wrap">
-      <button onclick="manualRefresh()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium flex items-center gap-2">
+      <button onclick="manualRefresh()" 
+              class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium flex items-center gap-2">
         <i class="fas fa-sync"></i> Refresh Live Data (ESPN)
       </button>
-      <button onclick="showDebugModal()" class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium flex items-center gap-2">
+      <button onclick="showDebugModal()" 
+              class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium flex items-center gap-2">
         <i class="fas fa-bug"></i> Show Debug Info
       </button>
     </div>
 
     <div id="statusBar" class="text-center text-sm mb-6 text-zinc-400"></div>
 
+    <!-- Tabs -->
     <div class="flex border-b border-zinc-700 mb-6">
       <button onclick="switchTab(0)" id="tab0" class="tab-button px-6 py-3 font-medium border-b-2 border-blue-500 text-blue-400">Teams</button>
       <button onclick="switchTab(1)" id="tab1" class="tab-button px-6 py-3 font-medium text-zinc-400">Full Field</button>
     </div>
 
+    <!-- TEAMS TAB -->
     <div id="content0">
       <div id="simLoading" class="hidden text-center py-8 text-zinc-400">
-        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><br>Running Monte Carlo simulation...
+        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><br>
+        Running Monte Carlo simulation (~5000 runs)...
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm" id="teamsTable">
           <thead>
             <tr class="border-b border-zinc-700">
               <th class="text-left py-3 px-4">Rank</th>
-              <th class="text-left py-3 px-4">Entrant</th>
-              <th class="text-center py-3 px-4">Team Avg (best 4)</th>
+              <th class="text-left py-3 px-4">Entrant + Best 4</th>
+              <th class="text-center py-3 px-4">Team Avg</th>
               <th class="text-center py-3 px-4">% to Win</th>
               <th class="w-8"></th>
             </tr>
@@ -54,6 +60,7 @@
       </div>
     </div>
 
+    <!-- FIELD TAB -->
     <div id="content1" class="hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm" id="fieldTable">
@@ -76,18 +83,20 @@
   </div>
 
   <!-- Debug Modal -->
-  <div id="debugModal" onclick="if(event.target.id==='debugModal')hideDebugModal()" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+  <div id="debugModal" onclick="if(event.target.id==='debugModal')hideDebugModal()" 
+       class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
     <div class="bg-zinc-900 rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
-      <div class="flex justify-between mb-6">
-        <h2 class="text-2xl font-bold">🔧 Debug Information</h2>
-        <button onclick="hideDebugModal()" class="text-xl">✕</button>
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">🔧 Full Debug Information</h2>
+        <button onclick="hideDebugModal()" class="text-zinc-400 hover:text-white text-xl">✕</button>
       </div>
       <div id="debugContent" class="space-y-8 text-sm"></div>
     </div>
   </div>
 
-  <!-- Breakdown Modal -->
-  <div id="modal" onclick="if(event.target.id==='modal')closeModal()" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+  <!-- Team breakdown modal (now shows ALL golfers) -->
+  <div id="modal" onclick="if(event.target.id==='modal')closeModal()" 
+       class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
     <div id="modalContent" class="bg-zinc-900 rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-auto"></div>
   </div>
 
@@ -125,8 +134,9 @@
     async function fetchLiveData() {
       const statusEl = document.getElementById("statusBar");
       const updateEl = document.getElementById("lastUpdate");
-      statusEl.innerHTML = `<span class="text-yellow-400">🔄 Fetching from ESPN...</span>`;
+      statusEl.innerHTML = `<span class="text-yellow-400">🔄 Fetching from ESPN Scoreboard...</span>`;
       updateEl.textContent = "Fetching...";
+      fetchError = null;
 
       try {
         const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?event=401811947&t=${Date.now()}`;
@@ -144,32 +154,39 @@
           let name = c.athlete?.displayName?.trim();
           if (!name) return;
 
-          // Strong name normalization
+          // Name normalization
           name = name.replace("J.J. Spaun", "JJ Spaun")
                      .replace("J.T. Poston", "JT Poston")
                      .replace("Joaquín Niemann", "Joaquin Niemann")
                      .replace("Christiaan Bezuidenhout", "Christian Bezuidenhout");
 
-          // Parse score correctly
+          // Score parsing
           let toPar = 0;
-          if (c.score) {
+          if (c.score !== undefined) {
             const scoreStr = String(c.score).trim();
             toPar = parseFloat(scoreStr.replace('+', '').replace('−', '-')) || 0;
           }
 
+          // Thru parsing (improved)
+          let thru = "—";
+          if (c.status?.type?.shortDetail) thru = c.status.type.shortDetail;
+          else if (c.thru) thru = c.thru;
+          else if (c.linescores?.[0]?.displayValue) thru = c.linescores[0].displayValue;
+
           playersMap.set(name, {
             toPar: toPar,
-            thru: c.status?.type?.shortDetail || "—",
+            thru: thru,
             today: c.score || ""
           });
         });
 
-        statusEl.innerHTML = `<span class="text-green-400">✅ Loaded ${playersMap.size} players</span>`;
+        statusEl.innerHTML = `<span class="text-green-400">✅ Loaded ${playersMap.size} players from ESPN</span>`;
         updateEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         renderAll();
       } catch(e) {
         fetchError = e.message;
         statusEl.innerHTML = `<span class="text-red-400">❌ ${e.message}</span>`;
+        updateEl.textContent = "Failed – see Debug";
         console.error(e);
       }
     }
@@ -184,11 +201,10 @@
 
       const best4 = scores.slice(0,4);
       const avg = (best4.reduce((sum, s) => sum + s.toPar, 0) / 4).toFixed(1);
-      return {avg: parseFloat(avg), best4, matchedCount: matched};
+      return {avg: parseFloat(avg), best4, allScores: scores, matchedCount: matched};
     }
 
-    // Monte Carlo + render functions (same as before)
-    function calculateWinProbabilities() { /* unchanged from previous */ 
+    function calculateWinProbabilities() {
       const simLoading = document.getElementById("simLoading");
       simLoading.classList.remove("hidden");
       return new Promise(resolve => {
@@ -220,15 +236,19 @@
 
       const teamsWithData = entrants.map((entry, i) => {
         const team = getTeamScore(entry);
-        return { ...entry, teamAvg: team.avg, best4: team.best4, prob: probs[i] };
+        return { ...entry, teamAvg: team.avg, best4: team.best4, allScores: team.allScores, prob: probs[i] };
       }).sort((a,b) => a.teamAvg - b.teamAvg);
 
       teamsWithData.forEach((team, index) => {
+        const best4Str = team.best4.map(p => `${p.name} (${p.toPar > 0 ? '+' : ''}${p.toPar})`).join(", ");
         const row = document.createElement("tr");
         row.className = "team-row cursor-pointer border-b border-zinc-800 hover:bg-zinc-900";
         row.innerHTML = `
           <td class="py-4 px-4 font-mono">${index+1}</td>
-          <td class="py-4 px-4 font-medium">${team.name}</td>
+          <td class="py-4 px-4">
+            <div class="font-medium">${team.name}</div>
+            <div class="best4 text-xs">Best 4: ${best4Str}</div>
+          </td>
           <td class="py-4 px-4 text-center font-mono text-xl ${team.teamAvg < 0 ? 'positive' : team.teamAvg > 0 ? 'negative' : ''}">${team.teamAvg}</td>
           <td class="py-4 px-4 text-center font-bold text-emerald-400">${team.prob}%</td>
           <td class="py-4 px-4"><i class="fas fa-chevron-down"></i></td>
@@ -238,46 +258,107 @@
       });
     }
 
-    function showTeamBreakdown(team) { /* same as before */ 
-      let html = `<h3 class="text-2xl font-bold mb-6">${team.name} — Avg <span class="${team.teamAvg < 0 ? 'positive' : 'negative'}">${team.teamAvg}</span></h3>`;
+    function showTeamBreakdown(team) {
+      let html = `<h3 class="text-2xl font-bold mb-6">${team.name} — Team Avg <span class="${team.teamAvg < 0 ? 'positive' : 'negative'}">${team.teamAvg}</span></h3>`;
       html += `<div class="space-y-4">`;
-      team.best4.forEach(p => {
-        html += `<div class="bg-zinc-800 p-5 rounded-xl"><div class="font-semibold">${p.name}</div><div class="text-4xl font-mono mt-2 ${p.toPar < 0 ? 'positive' : p.toPar > 0 ? 'negative' : ''}">${p.toPar > 0 ? '+' : ''}${p.toPar}</div><div class="text-sm text-zinc-400">Thru ${p.thru}</div></div>`;
+      
+      team.allScores.forEach(p => {
+        const isBest4 = team.best4.some(b => b.name === p.name);
+        html += `
+          <div class="${isBest4 ? 'bg-emerald-900/30 border border-emerald-500' : 'bg-zinc-800'} p-5 rounded-xl flex justify-between items-center">
+            <div>
+              <div class="font-semibold">${p.name}</div>
+              <div class="text-sm text-zinc-400">Thru ${p.thru}</div>
+            </div>
+            <div class="text-4xl font-mono ${p.toPar < 0 ? 'positive' : p.toPar > 0 ? 'negative' : ''}">
+              ${p.toPar > 0 ? '+' : ''}${p.toPar}
+            </div>
+            ${isBest4 ? '<span class="text-xs bg-emerald-600 px-3 py-1 rounded-full">BEST 4</span>' : ''}
+          </div>`;
       });
-      html += `</div><button onclick="closeModal()" class="mt-8 w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-xl">Close</button>`;
+      
+      html += `</div><button onclick="closeModal()" class="mt-8 w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-xl text-lg">Close</button>`;
       document.getElementById("modalContent").innerHTML = html;
       document.getElementById("modal").classList.remove("hidden");
     }
 
-    function closeModal() { document.getElementById("modal").classList.add("hidden"); }
-
-    function renderField() { /* unchanged */ 
-      const tbody = document.getElementById("fieldBody");
-      tbody.innerHTML = "";
-      Array.from(playersMap.entries()).sort((a,b) => a[1].toPar - b[1].toPar).forEach(([name, d]) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `<td class="py-3 px-4">${name}</td><td class="py-3 px-4 text-center font-mono text-lg ${d.toPar<0?'positive':d.toPar>0?'negative':''}">${d.toPar>0?'+':''}${d.toPar}</td><td class="py-3 px-4 text-center">${d.thru}</td><td class="py-3 px-4 text-center">${d.today}</td>`;
-        tbody.appendChild(row);
-      });
+    function closeModal() {
+      document.getElementById("modal").classList.add("hidden");
     }
 
-    async function renderAll() { await renderTeams(); renderField(); }
+    function renderField() {
+      const tbody = document.getElementById("fieldBody");
+      tbody.innerHTML = "";
+      Array.from(playersMap.entries())
+        .sort((a,b) => a[1].toPar - b[1].toPar)
+        .forEach(([name, data]) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td class="py-3 px-4">${name}</td>
+            <td class="py-3 px-4 text-center font-mono text-lg ${data.toPar < 0 ? 'positive' : data.toPar > 0 ? 'negative' : ''}">${data.toPar > 0 ? '+' : ''}${data.toPar}</td>
+            <td class="py-3 px-4 text-center">${data.thru}</td>
+            <td class="py-3 px-4 text-center">${data.today}</td>
+          `;
+          tbody.appendChild(row);
+        });
+    }
+
+    async function renderAll() {
+      await renderTeams();
+      renderField();
+    }
 
     function manualRefresh() { fetchLiveData(); }
-    function switchTab(n) { /* unchanged tab logic */ 
-      document.querySelectorAll('.tab-button').forEach((b,i)=>{b.classList.toggle('border-blue-500',i===n); b.classList.toggle('text-blue-400',i===n); b.classList.toggle('text-zinc-400',i!==n);});
+
+    function switchTab(n) {
+      document.querySelectorAll('.tab-button').forEach((b,i) => {
+        b.classList.toggle('border-blue-500', i===n);
+        b.classList.toggle('text-blue-400', i===n);
+        b.classList.toggle('text-zinc-400', i!==n);
+      });
       document.getElementById("content0").classList.toggle("hidden", n!==0);
       document.getElementById("content1").classList.toggle("hidden", n!==1);
     }
 
-    function showDebugModal() { /* full debug as before */ 
-      // (Same debug function from previous version - omitted for brevity but included in full file)
-      // You can copy it from the previous message if needed
+    function showDebugModal() {
+      const content = document.getElementById("debugContent");
+      let html = `<div><strong>Fetch Status:</strong> ${fetchError ? `<span class="text-red-400">FAILED – ${fetchError}</span>` : `<span class="text-green-400">SUCCESS</span>`}</div>`;
+      html += `<div><strong>Players loaded from ESPN:</strong> ${playersMap.size}</div>`;
+      html += `<div><strong>Last update:</strong> ${document.getElementById("lastUpdate").textContent}</div><hr>`;
+
+      html += `<div class="font-semibold">Pool Golfer Matching:</div>`;
+      entrants.forEach(entry => {
+        const team = getTeamScore(entry);
+        const percent = Math.round((team.matchedCount / entry.golfers.length) * 100);
+        html += `<div class="flex justify-between text-xs"><span>${entry.name}</span><span class="${percent===100?'text-green-400':'text-yellow-400'}">${team.matchedCount}/${entry.golfers.length} (${percent}%)</span></div>`;
+      });
+
+      html += `<hr><div class="font-semibold">All pool golfers (matched / not matched)</div>`;
+      const allPool = new Set();
+      entrants.forEach(e => e.golfers.forEach(g => allPool.add(g)));
+      html += `<div class="grid grid-cols-2 gap-1 text-xs max-h-64 overflow-auto border border-zinc-700 p-3 rounded-xl">`;
+      Array.from(allPool).sort().forEach(g => {
+        const found = playersMap.has(g);
+        html += `<div class="${found ? 'text-green-400' : 'text-red-400'}">${g} ${found ? '✅' : '❌'}</div>`;
+      });
+      html += `</div>`;
+
+      // Extra debug: sample thru values
+      if (lastRawData) {
+        html += `<hr><div class="font-semibold">Sample Thru values (first 5 players)</div>`;
+        const sample = (lastRawData.events?.[0]?.competitions?.[0]?.competitors || []).slice(0,5);
+        html += `<pre class="bg-black p-3 rounded-2xl overflow-auto text-[10px]">${JSON.stringify(sample.map(c => ({name: c.athlete?.displayName, thru: c.status?.type?.shortDetail || c.thru})), null, 2)}</pre>`;
+      }
+
+      content.innerHTML = html;
+      document.getElementById("debugModal").classList.remove("hidden");
     }
 
-    function hideDebugModal() { document.getElementById("debugModal").classList.add("hidden"); }
+    function hideDebugModal() {
+      document.getElementById("debugModal").classList.add("hidden");
+    }
 
-    // Start
+    // Initial load
     fetchLiveData();
   </script>
 </body>
